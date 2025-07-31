@@ -81,6 +81,110 @@ header p {
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
+.input-tabs {
+    display: flex;
+    margin-bottom: 15px;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.input-tab-btn {
+    flex: 1;
+    padding: 8px 16px;
+    background: none;
+    border: none;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #6c757d;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-bottom: 3px solid transparent;
+}
+
+.input-tab-btn.active {
+    color: #667eea;
+    border-bottom-color: #667eea;
+}
+
+.input-tab-btn:hover {
+    color: #667eea;
+}
+
+.input-content {
+    display: none;
+}
+
+.input-content.active {
+    display: block;
+}
+
+.url-input {
+    width: 100%;
+    padding: 15px;
+    border: 2px solid #e1e5e9;
+    border-radius: 10px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    transition: border-color 0.3s ease;
+    margin-bottom: 10px;
+}
+
+.url-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.load-btn {
+    width: 100%;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+}
+
+.load-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.load-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.loading {
+    position: relative;
+    color: transparent !important;
+}
+
+.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 16px;
+    height: 16px;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: translate(-50%, -50%) rotate(360deg);
+    }
+}
+
 .input-options {
     margin-top: 15px;
     padding-top: 15px;
@@ -405,7 +509,8 @@ header p {
 
 .card-item:hover {
     background: #e9ecef;
-    transform: translateX(5px);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
 .card-info {
@@ -442,6 +547,17 @@ header p {
     margin-left: 10px;
 }
 
+.partial-match {
+    margin-top: 5px;
+    padding: 4px 8px;
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 6px;
+    color: #856404;
+    font-size: 0.8rem;
+    font-style: italic;
+}
+
 .empty-state {
     text-align: center;
     padding: 40px;
@@ -458,6 +574,14 @@ header p {
     .input-section {
         grid-template-columns: 1fr;
         gap: 20px;
+    }
+    
+    .input-tabs {
+        flex-direction: column;
+    }
+    
+    .input-tab-btn {
+        text-align: center;
     }
     
     .results-stats {

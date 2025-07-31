@@ -16,7 +16,17 @@
         <div class="input-section">
             <div class="input-group">
                 <label for="wishlist">Wishlist Cards:</label>
-                <textarea id="wishlist" placeholder="Paste your wishlist here (Moxfield format)&#10;Example:&#10;1 Aether Channeler (DMU) 42 *F*&#10;2 Lightning Bolt (M10) 133"></textarea>
+                <div class="input-tabs">
+                    <button class="input-tab-btn active" data-input-tab="wishlist-text">Text</button>
+                    <button class="input-tab-btn" data-input-tab="wishlist-url">Moxfield URL</button>
+                </div>
+                <div class="input-content active" id="wishlistTextTab">
+                    <textarea id="wishlist" placeholder="Paste your wishlist here (Moxfield format)&#10;Example:&#10;1 Aether Channeler (DMU) 42 *F*&#10;2 Lightning Bolt (M10) 133"></textarea>
+                </div>
+                <div class="input-content" id="wishlistUrlTab">
+                    <input type="url" id="wishlistUrl" placeholder="https://www.moxfield.com/decks/..." class="url-input">
+                    <button id="loadWishlistBtn" class="load-btn">Load from URL</button>
+                </div>
                 <div class="input-options">
                     <label class="checkbox-label">
                         <input type="checkbox" id="ignoreWishlistSideboard" checked>
@@ -28,7 +38,17 @@
 
             <div class="input-group">
                 <label for="collection">Collection Cards:</label>
-                <textarea id="collection" placeholder="Paste your collection here (Moxfield format)&#10;Example:&#10;1 Aether Channeler (DMU) 42 *F*&#10;3 Lightning Bolt (M10) 133"></textarea>
+                <div class="input-tabs">
+                    <button class="input-tab-btn active" data-input-tab="collection-text">Text</button>
+                    <button class="input-tab-btn" data-input-tab="collection-url">Moxfield URL</button>
+                </div>
+                <div class="input-content active" id="collectionTextTab">
+                    <textarea id="collection" placeholder="Paste your collection here (Moxfield format)&#10;Example:&#10;1 Aether Channeler (DMU) 42 *F*&#10;3 Lightning Bolt (M10) 133"></textarea>
+                </div>
+                <div class="input-content" id="collectionUrlTab">
+                    <input type="url" id="collectionUrl" placeholder="https://www.moxfield.com/decks/..." class="url-input">
+                    <button id="loadCollectionBtn" class="load-btn">Load from URL</button>
+                </div>
                 <div class="input-options">
                     <label class="checkbox-label">
                         <input type="checkbox" id="ignoreCollectionSideboard" checked>

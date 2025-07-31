@@ -5,13 +5,17 @@ A web-based tool for comparing Magic: The Gathering card wishlists with collecti
 ## Features
 
 - **Moxfield Format Support**: Parses card lists in the Moxfield format
+- **Moxfield URL Loading**: Load deck data directly from Moxfield URLs
 - **Flexible Matching**: Option to ignore edition and search by card name only
+- **Sideboard Handling**: Automatically ignores sideboard cards (everything after "SIDEBOARD:")
 - **Detailed Results**: Shows matches and missing cards with quantities
+- **Parsing Feedback**: Shows detailed feedback about parsing errors and statistics
 - **Modern UI**: Beautiful, responsive design that works on desktop and mobile
 - **Real-time Statistics**: Displays counts of cards in wishlist, collection, and matches found
 
 ## How to Use
 
+### Method 1: Manual Input
 1. **Open the Application**: Open `index.html` in your web browser
 2. **Enter Your Wishlist**: Paste your wishlist cards in the left text area
 3. **Enter Your Collection**: Paste your collection cards in the right text area
@@ -19,22 +23,44 @@ A web-based tool for comparing Magic: The Gathering card wishlists with collecti
 5. **Search**: Click the "Search for Matches" button
 6. **View Results**: See matches and missing cards in the tabs below
 
+### Method 2: Moxfield URL Loading
+1. **Switch to URL Tab**: Click the "Moxfield URL" tab for wishlist or collection
+2. **Enter Moxfield URL**: Paste a Moxfield deck URL (e.g., `https://www.moxfield.com/decks/deck-id`) or direct API URL
+3. **Load Data**: Click "Load from URL" to fetch and parse the deck data using Moxfield's API
+4. **Review Data**: The parsed card list will appear in the text area
+5. **Search**: Click "Search for Matches" to compare the lists
+
+**Supported URL Formats:**
+- Regular Moxfield URLs: `https://www.moxfield.com/decks/deck-id`
+- Direct API URLs: `https://api2.moxfield.com/v2/decks/all/deck-id`
+
 ## Card Format
 
-The tool supports the Moxfield format for card lists:
+The tool supports flexible Moxfield-style formats for card lists:
 
+### Full Format
 ```
 1 Aether Channeler (DMU) 42 *F*
 2 Lightning Bolt (M10) 133
 3 Counterspell (M10) 52 *F*
 ```
 
+### Flexible Formats Supported
+- `1 Aether Channeler (DMU) 42 *F*` - Full format
+- `Aether Channeler (DMU) 42 *F*` - No quantity (assumes 1)
+- `1 Aether Channeler 42 *F*` - No set code
+- `Aether Channeler 42 *F*` - No quantity, no set code
+- `1 Aether Channeler (DMU) *F*` - No card number
+- `Aether Channeler (DMU) *F*` - No quantity, no number
+- `1 Aether Channeler` - Just quantity and name
+- `Aether Channeler` - Just name (assumes quantity 1)
+
 **Format Breakdown:**
-- `1` - Quantity
-- `Aether Channeler` - Card name
-- `(DMU)` - Set code
+- `1` - Quantity (optional, defaults to 1)
+- `Aether Channeler` - Card name (required)
+- `(DMU)` - Set code (optional)
 - `42` - Card number (optional)
-- `*F*` - Foil indicator (optional)
+- `*F*` - Foil indicator (optional, `*E*` for etched)
 
 ## Examples
 
