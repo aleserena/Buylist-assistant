@@ -14,9 +14,13 @@ class MTGCardComparator {
         this.ignoreEditionCheckbox = document.getElementById('ignoreEdition');
         this.ignoreWishlistSideboardCheckbox = document.getElementById('ignoreWishlistSideboard');
         this.ignoreCollectionSideboardCheckbox = document.getElementById('ignoreCollectionSideboard');
+        this.priceProviderSelect = document.getElementById('priceProvider');
         this.searchBtn = document.getElementById('searchBtn');
         this.resultsSection = document.getElementById('resultsSection');
         this.feedbackSection = document.getElementById('feedbackSection');
+        
+        // Price cache to avoid repeated API calls
+        this.priceCache = new Map();
         
         // Stats elements
         this.totalWishlistEl = document.getElementById('totalWishlist');
@@ -69,6 +73,9 @@ class MTGCardComparator {
         // URL loading
         this.loadWishlistBtn.addEventListener('click', () => this.loadFromUrl('wishlist'));
         this.loadCollectionBtn.addEventListener('click', () => this.loadFromUrl('collection'));
+        
+        // Price provider change
+        this.priceProviderSelect.addEventListener('change', () => this.refreshAllPrices());
     }
 
     parseCardLine(line) {
@@ -202,6 +209,189 @@ class MTGCardComparator {
         return null;
     }
 
+    async fetchCardPrice(cardName, setCode = '', isFoil = false, isEtched = false) {
+        const provider = this.priceProviderSelect.value;
+        const cacheKey = this.getPriceCacheKey(cardName, setCode, isFoil, isEtched, provider);
+        
+        // Check cache first
+        if (this.priceCache.has(cacheKey)) {
+            return this.priceCache.get(cacheKey);
+        }
+
+        try {
+            // Use Scryfall API for card data and pricing
+            let searchQuery = cardName;
+            if (setCode) {
+                searchQuery += ` set:${setCode}`;
+            }
+            
+            const response = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(searchQuery)}`);
+            
+            if (!response.ok) {
+                if (response.status === 429) {
+                    throw new Error('Rate limit exceeded. Please try again later.');
+                }
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            if (!data.data || data.data.length === 0) {
+                throw new Error('Card not found');
+            }
+
+            // Find the best matching card
+            let bestMatch = data.data[0];
+            let price = null;
+
+            // Try to find exact match with foil/etched status
+            for (const card of data.data) {
+                if (setCode && card.set === setCode.toUpperCase()) {
+                    if (isEtched && card.finishes && card.finishes.includes('etched')) {
+                        bestMatch = card;
+                        break;
+                    } else if (isFoil && card.finishes && card.finishes.includes('foil')) {
+                        bestMatch = card;
+                        break;
+                    } else if (!isFoil && !isEtched && card.finishes && card.finishes.includes('nonfoil')) {
+                        bestMatch = card;
+                        break;
+                    }
+                }
+            }
+
+            // Get price based on provider
+            if (bestMatch.prices) {
+                switch (provider) {
+                    case 'cardkingdom':
+                        price = isFoil ? bestMatch.prices.usd_foil : bestMatch.prices.usd;
+                        break;
+                    case 'tcgplayer':
+                        price = isFoil ? bestMatch.prices.usd_foil : bestMatch.prices.usd;
+                        break;
+                    case 'starcitygames':
+                        price = isFoil ? bestMatch.prices.usd_foil : bestMatch.prices.usd;
+                        break;
+                    case 'coolstuffinc':
+                        price = isFoil ? bestMatch.prices.usd_foil : bestMatch.prices.usd;
+                        break;
+                    case 'cardhoarder':
+                        price = isFoil ? bestMatch.prices.usd_foil : bestMatch.prices.usd;
+                        break;
+                    case 'cardmarket':
+                        price = isFoil ? bestMatch.prices.eur_foil : bestMatch.prices.eur;
+                        break;
+                    default:
+                        price = isFoil ? bestMatch.prices.usd_foil : bestMatch.prices.usd;
+                }
+            }
+
+            // If no specific price found, try to get any available price
+            if (!price && bestMatch.prices) {
+                price = bestMatch.prices.usd || bestMatch.prices.usd_foil || bestMatch.prices.eur || bestMatch.prices.eur_foil;
+            }
+
+            const result = {
+                price: price,
+                provider: provider,
+                timestamp: Date.now(),
+                cardName: bestMatch.name,
+                setCode: bestMatch.set
+            };
+
+            // Cache the result
+            this.priceCache.set(cacheKey, result);
+            return result;
+
+        } catch (error) {
+            console.warn(`Failed to fetch price for ${cardName}:`, error);
+            const result = {
+                price: null,
+                error: error.message,
+                provider: provider,
+                timestamp: Date.now()
+            };
+            this.priceCache.set(cacheKey, result);
+            return result;
+        }
+    }
+
+    getPriceCacheKey(cardName, setCode, isFoil, isEtched, provider) {
+        return `${cardName.toLowerCase()}_${setCode.toLowerCase()}_${isFoil}_${isEtched}_${provider}`;
+    }
+
+    async updateCardPrice(cardElement, card, type) {
+        const priceElement = cardElement.querySelector('.price-badge, .price-loading, .price-error');
+        
+        if (!priceElement) {
+            // Add loading indicator
+            const loadingElement = document.createElement('span');
+            loadingElement.className = 'price-loading';
+            loadingElement.textContent = 'Loading...';
+            cardElement.querySelector('.card-details').appendChild(loadingElement);
+        }
+
+        try {
+            let cardName, setCode, isFoil, isEtched;
+            
+            if (type === 'match') {
+                cardName = card.wishlist.name;
+                setCode = card.wishlist.set || '';
+                isFoil = card.wishlist.foil || false;
+                isEtched = card.wishlist.etched || false;
+            } else {
+                cardName = card.name;
+                setCode = card.set || '';
+                isFoil = card.foil || false;
+                isEtched = card.etched || false;
+            }
+
+            const priceData = await this.fetchCardPrice(cardName, setCode, isFoil, isEtched);
+            
+            // Remove loading indicator
+            const existingPriceElement = cardElement.querySelector('.price-badge, .price-loading, .price-error');
+            if (existingPriceElement) {
+                existingPriceElement.remove();
+            }
+
+            if (priceData.price) {
+                const priceElement = document.createElement('span');
+                priceElement.className = 'price-badge';
+                if (isFoil) priceElement.classList.add('foil');
+                if (isEtched) priceElement.classList.add('etched');
+                
+                // Format price with appropriate currency
+                const provider = this.priceProviderSelect.value;
+                const currency = provider === 'cardmarket' ? '€' : '$';
+                const formattedPrice = parseFloat(priceData.price).toFixed(2);
+                priceElement.textContent = `${currency}${formattedPrice}`;
+                
+                // Add tooltip with provider info
+                priceElement.title = `Price from ${this.priceProviderSelect.options[this.priceProviderSelect.selectedIndex].text}`;
+                
+                cardElement.querySelector('.card-details').appendChild(priceElement);
+            } else {
+                const errorElement = document.createElement('span');
+                errorElement.className = 'price-error';
+                errorElement.textContent = 'N/A';
+                errorElement.title = 'Price not available';
+                cardElement.querySelector('.card-details').appendChild(errorElement);
+            }
+        } catch (error) {
+            console.error('Error updating card price:', error);
+            const existingPriceElement = cardElement.querySelector('.price-badge, .price-loading, .price-error');
+            if (existingPriceElement) {
+                existingPriceElement.remove();
+            }
+            
+            const errorElement = document.createElement('span');
+            errorElement.className = 'price-error';
+            errorElement.textContent = 'Error';
+            errorElement.title = 'Failed to load price';
+            cardElement.querySelector('.card-details').appendChild(errorElement);
+        }
+    }
+
     parseCardList(text, ignoreSideboard = true) {
         const lines = text.split('\n');
         const cards = [];
@@ -238,16 +428,7 @@ class MTGCardComparator {
             }
         });
 
-        // Debug logging
-        console.log(`Parsed ${cards.length} cards, ${errors.length} errors`);
-        if (errors.length > 0) {
-            console.log('Failed lines:', errors);
-        }
-        
-        // Additional debugging: log first few successful parses
-        if (cards.length > 0) {
-            console.log('First 5 successful parses:', cards.slice(0, 5));
-        }
+
 
         return { cards, errors };
     }
@@ -441,7 +622,92 @@ class MTGCardComparator {
             `;
 
             container.appendChild(cardElement);
+            
+            // Fetch and display price for the card
+            this.updateCardPrice(cardElement, card, type);
         });
+    }
+
+    async refreshAllPrices() {
+        // Clear price cache when provider changes
+        this.priceCache.clear();
+        
+        // Refresh prices for all displayed cards
+        const matchCards = this.matchesListEl.querySelectorAll('.card-item');
+        const missingCards = this.missingListEl.querySelectorAll('.card-item');
+        
+        // Refresh match cards
+        for (const cardElement of matchCards) {
+            const cardData = this.getCardDataFromElement(cardElement, 'match');
+            if (cardData) {
+                await this.updateCardPrice(cardElement, cardData, 'match');
+            }
+        }
+        
+        // Refresh missing cards
+        for (const cardElement of missingCards) {
+            const cardData = this.getCardDataFromElement(cardElement, 'missing');
+            if (cardData) {
+                await this.updateCardPrice(cardElement, cardData, 'missing');
+            }
+        }
+        
+        // Refresh total prices if results are displayed
+        if (this.resultsSection.style.display !== 'none') {
+            const matchCardsData = this.getCardsDataFromElements(matchCards, 'match');
+            const missingCardsData = this.getCardsDataFromElements(missingCards, 'missing');
+            // await this.calculateAndDisplayTotalPrices(matchCardsData, missingCardsData); // Removed
+        }
+    }
+
+    getCardsDataFromElements(cardElements, type) {
+        const cards = [];
+        for (const cardElement of cardElements) {
+            const cardData = this.getCardDataFromElement(cardElement, type);
+            if (cardData) {
+                cards.push(cardData);
+            }
+        }
+        return cards;
+    }
+
+    getCardDataFromElement(cardElement, type) {
+        // Extract card data from the DOM element
+        const cardName = cardElement.querySelector('.card-name').textContent;
+        const cardDetails = cardElement.querySelector('.card-details').textContent;
+        
+        // Parse set and number from details
+        const setMatch = cardDetails.match(/\(([^)]+)\)/);
+        const numberMatch = cardDetails.match(/\([^)]+\)\s*([A-Z0-9\-]+[a-z]*)/);
+        const isFoil = cardDetails.includes('Foil');
+        const isEtched = cardDetails.includes('Etched');
+        
+        if (type === 'match') {
+            return {
+                wishlist: {
+                    name: cardName,
+                    set: setMatch ? setMatch[1] : '',
+                    number: numberMatch ? numberMatch[1] : '',
+                    foil: isFoil,
+                    etched: isEtched
+                },
+                collection: {
+                    name: cardName,
+                    set: setMatch ? setMatch[1] : '',
+                    number: numberMatch ? numberMatch[1] : '',
+                    foil: isFoil,
+                    etched: isEtched
+                }
+            };
+        } else {
+            return {
+                name: cardName,
+                set: setMatch ? setMatch[1] : '',
+                number: numberMatch ? numberMatch[1] : '',
+                foil: isFoil,
+                etched: isEtched
+            };
+        }
     }
 
     displayFeedback(wishlistErrors, collectionErrors, wishlistCards, collectionCards) {
@@ -579,35 +845,41 @@ class MTGCardComparator {
         loadBtn.textContent = 'Loading...';
         
         try {
-            let deckData = null;
+            let data = null;
             
             // Check if it's a direct API URL
             if (url.includes('api2.moxfield.com')) {
-                deckData = await this.loadFromApiUrl(url, type);
+                data = await this.loadFromApiUrl(url, type);
             } else {
-                // Extract deck ID from regular Moxfield URL and use main deck API
-                const deckId = this.extractDeckId(url);
-                if (deckId) {
-                    const apiUrl = `https://api2.moxfield.com/v2/decks/all/${deckId}`;
-                    deckData = await this.loadFromApiUrl(apiUrl, type);
+                // First try to extract as deck
+                const deckInfo = this.extractDeckId(url);
+                if (deckInfo) {
+                    const apiUrl = `https://api2.moxfield.com/v2/decks/all/${deckInfo.id}`;
+                    data = await this.loadFromApiUrl(apiUrl, type);
                 } else {
-                    throw new Error('Invalid Moxfield URL format');
+                    // Try to extract as collection
+                    const collectionInfo = this.extractCollectionId(url);
+                    if (collectionInfo) {
+                        data = await this.loadFromCollection(collectionInfo.id, type);
+                    } else {
+                        throw new Error('Invalid Moxfield URL format. Please use a valid deck or collection URL.');
+                    }
                 }
             }
             
-            if (deckData && deckData.trim()) {
-                textarea.value = deckData;
+            if (data && data.trim()) {
+                textarea.value = data;
                 // Switch to text tab to show the loaded data
                 this.switchInputTab(`${type}-text`);
                 
                 // Show success message with card count (excluding SIDEBOARD: line)
-                const cardCount = deckData.split('\n').filter(line => {
+                const cardCount = data.split('\n').filter(line => {
                     const trimmed = line.trim();
                     return trimmed && !trimmed.toUpperCase().includes('SIDEBOARD:');
                 }).length;
-                alert(`Deck data loaded successfully! Found ${cardCount} cards.`);
+                alert(`Data loaded successfully! Found ${cardCount} cards.`);
             } else {
-                throw new Error('Could not extract deck data. The deck might be private or the API structure has changed.');
+                throw new Error('Could not extract data. The deck/collection might be private or the API structure has changed.');
             }
             
         } catch (error) {
@@ -635,7 +907,24 @@ class MTGCardComparator {
         for (const pattern of patterns) {
             const match = url.match(pattern);
             if (match) {
-                return match[1];
+                return { type: 'deck', id: match[1] };
+            }
+        }
+        
+        return null;
+    }
+
+    extractCollectionId(url) {
+        // Extract collection ID from various Moxfield URL formats
+        const patterns = [
+            /moxfield\.com\/collection\/([a-zA-Z0-9_-]+)/,
+            /api2\.moxfield\.com\/v1\/collections\/search\/([a-zA-Z0-9_-]+)/
+        ];
+        
+        for (const pattern of patterns) {
+            const match = url.match(pattern);
+            if (match) {
+                return { type: 'collection', id: match[1] };
             }
         }
         
@@ -710,20 +999,52 @@ class MTGCardComparator {
         // If all attempts failed
         throw new Error(`All proxy attempts failed: ${lastError?.message || 'Unknown error'}. Please try again later or use manual input.`);
     }
+
+    async loadFromCollection(collectionId, type) {
+        // Collection API uses pagination, so we need to fetch all pages
+        let allCards = [];
+        let pageNumber = 1;
+        const pageSize = 50;
+        
+        while (true) {
+            const apiUrl = `https://api2.moxfield.com/v1/collections/search/${collectionId}?sortType=cardName&sortDirection=ascending&pageNumber=${pageNumber}&pageSize=${pageSize}&playStyle=paperDollars&pricingProvider=cardkingdom`;
+            
+            try {
+                const data = await this.loadFromApiUrl(apiUrl, type);
+                if (data && data.trim()) {
+                    const cards = data.split('\n').filter(line => {
+                        const trimmed = line.trim();
+                        return trimmed && !trimmed.toUpperCase().includes('SIDEBOARD:');
+                    });
+                    
+                    if (cards.length === 0) {
+                        break; // No more cards
+                    }
+                    
+                    allCards = allCards.concat(cards);
+                    pageNumber++;
+                    
+                    // Safety check to prevent infinite loops
+                    if (pageNumber > 100) {
+                        break;
+                    }
+                } else {
+                    break; // No more data
+                }
+            } catch (error) {
+                console.error(`Error loading collection page ${pageNumber}:`, error);
+                break;
+            }
+        }
+        
+        return allCards.join('\n');
+    }
     
     parseApiResponse(data, type) {
         try {
             let deckList = '';
             
-            // Debug: Log the first card structure to understand the API format
-            if (data.mainboard && Object.keys(data.mainboard).length > 0) {
-                const firstCardId = Object.keys(data.mainboard)[0];
-                const firstCard = data.mainboard[firstCardId];
-                console.log('First card structure:', firstCard);
-                console.log('Card data:', firstCard.card);
-                console.log('isFoil:', firstCard.card.isFoil);
-                console.log('finish:', firstCard.card.finish);
-            }
+
             
             // Check if we should ignore sideboard based on the checkbox
             const ignoreSideboard = type === 'wishlist' ? 
@@ -835,6 +1156,45 @@ class MTGCardComparator {
                     const isEtched = card.finish === 'etched' || 
                                    card.finish === 'foil-etched' ||
                                    card.etched === true ||
+                                   false;
+                    
+                    let cardLine = `${quantity} ${name} (${set})`;
+                    if (number) {
+                        cardLine += ` ${number}`;
+                    }
+                    if (isEtched) {
+                        cardLine += ' *E*';
+                    } else if (isFoil) {
+                        cardLine += ' *F*';
+                    }
+                    cards.push(cardLine);
+                });
+                
+                // Sort cards alphabetically
+                cards.sort();
+                deckList += cards.join('\n') + '\n';
+            } else if (data.data && Array.isArray(data.data)) {
+                // Collection API format - data array contains card objects
+                const cards = [];
+                
+                data.data.forEach(card => {
+                    const quantity = card.quantity || 1;
+                    const name = card.card?.name || card.name;
+                    const set = (card.card?.set || card.set || '').toUpperCase();
+                    const number = card.card?.cn || card.card?.number || card.card?.collector_number || card.number || '';
+                    
+                    // Enhanced foil detection for collection format
+                    const isFoil = card.card?.isFoil || 
+                                 card.card?.finish === 'foil' || 
+                                 card.card?.finish === 'foil-etched' ||
+                                 card.isFoil ||
+                                 false;
+                    
+                    // Enhanced etched detection for collection format
+                    const isEtched = card.card?.finish === 'etched' || 
+                                   card.card?.finish === 'foil-etched' ||
+                                   card.card?.etched === true ||
+                                   card.isEtched ||
                                    false;
                     
                     let cardLine = `${quantity} ${name} (${set})`;

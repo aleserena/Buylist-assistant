@@ -1,17 +1,42 @@
-# MTG Card List Comparator
+t ada# MTG Card List Comparator
 
 A web-based tool for comparing Magic: The Gathering card wishlists with collections to see which cards you already own.
 
 ## Features
 
 - **Moxfield Format Support**: Parses card lists in the Moxfield format
-- **Moxfield URL Loading**: Load deck data directly from Moxfield URLs
+- **Moxfield URL Loading**: Load deck and collection data directly from Moxfield URLs
 - **Flexible Matching**: Option to ignore edition and search by card name only
 - **Sideboard Handling**: Automatically ignores sideboard cards (everything after "SIDEBOARD:")
-- **Detailed Results**: Shows matches and missing cards with quantities
+- **Card Pricing**: Real-time card prices from multiple providers with price caching
+- **Detailed Results**: Shows matches and missing cards with quantities and prices
 - **Parsing Feedback**: Shows detailed feedback about parsing errors and statistics
 - **Modern UI**: Beautiful, responsive design that works on desktop and mobile
 - **Real-time Statistics**: Displays counts of cards in wishlist, collection, and matches found
+
+## Pricing Features
+
+The application includes real-time card pricing functionality:
+
+### Price Providers
+- **Card Kingdom** (default) - USD prices
+- **TCGPlayer** - USD prices  
+- **Star City Games** - USD prices
+- **CoolStuffInc** - USD prices
+- **CardHoarder** - USD prices
+- **CardMarket** - EUR prices
+
+### Price Display
+- Prices are automatically fetched and displayed for all cards in results
+- Foil and etched cards show appropriate pricing
+- Price cache prevents repeated API calls for the same card
+- Loading indicators show while prices are being fetched
+- Error handling for cards without available pricing
+
+### Price Provider Selection
+- Use the dropdown in the options section to change price providers
+- Prices automatically refresh when provider is changed
+- All displayed cards update with new provider prices
 
 ## How to Use
 
@@ -25,14 +50,16 @@ A web-based tool for comparing Magic: The Gathering card wishlists with collecti
 
 ### Method 2: Moxfield URL Loading
 1. **Switch to URL Tab**: Click the "Moxfield URL" tab for wishlist or collection
-2. **Enter Moxfield URL**: Paste a Moxfield deck URL (e.g., `https://www.moxfield.com/decks/deck-id`) or direct API URL
-3. **Load Data**: Click "Load from URL" to fetch and parse the deck data using Moxfield's API
+2. **Enter Moxfield URL**: Paste a Moxfield deck or collection URL (e.g., `https://www.moxfield.com/decks/deck-id` or `https://www.moxfield.com/collection/collection-id`) or direct API URL
+3. **Load Data**: Click "Load from URL" to fetch and parse the deck/collection data using Moxfield's API
 4. **Review Data**: The parsed card list will appear in the text area
 5. **Search**: Click "Search for Matches" to compare the lists
 
 **Supported URL Formats:**
 - Regular Moxfield URLs: `https://www.moxfield.com/decks/deck-id`
+- Collection URLs: `https://www.moxfield.com/collection/collection-id`
 - Direct API URLs: `https://api2.moxfield.com/v2/decks/all/deck-id`
+- Collection API URLs: `https://api2.moxfield.com/v1/collections/search/collection-id`
 
 ## Card Format
 
