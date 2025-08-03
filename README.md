@@ -1,4 +1,4 @@
-t ada# MTG Card List Comparator
+# MTG Card List Comparator
 
 A web-based tool for comparing Magic: The Gathering card wishlists with collections to see which cards you already own.
 
