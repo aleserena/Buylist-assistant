@@ -1,8 +1,5 @@
 // Jest setup file for DOM testing
 
-// Load the script file to ensure coverage collection
-require('../script.js');
-
 // Mock fetch globally
 global.fetch = jest.fn();
 
