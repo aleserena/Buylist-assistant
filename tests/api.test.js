@@ -17,6 +17,76 @@ describe('API Functionality Tests', () => {
         }
     });
 
+    // Run these tests first to avoid interference from other tests
+    test('should handle string data format', () => {
+        // Ensure parseApiResponse is not mocked for this test
+        if (comparator.parseApiResponse && comparator.parseApiResponse.mockRestore) {
+            comparator.parseApiResponse.mockRestore();
+        }
+        
+        const mockStringData = '1 Lightning Bolt (M10) 133\n2 Counterspell (M10) 50';
+        
+        const result = comparator.parseApiResponse(mockStringData, 'collection');
+        
+        expect(result).toBe('1 Lightning Bolt (M10) 133\n2 Counterspell (M10) 50');
+    });
+
+    test('should handle unknown data format with findCardsInResponse', () => {
+        // Ensure parseApiResponse is not mocked for this test
+        if (comparator.parseApiResponse && comparator.parseApiResponse.mockRestore) {
+            comparator.parseApiResponse.mockRestore();
+        }
+        
+        const mockUnknownData = {
+            someNestedObject: {
+                name: 'Lightning Bolt',
+                quantity: 2,
+                set: 'M10',
+                number: '133',
+                isFoil: false
+            }
+        };
+        
+        const result = comparator.parseApiResponse(mockUnknownData, 'collection');
+        
+        expect(result).toContain('2 Lightning Bolt (M10) 133');
+    });
+
+    test('should handle collection API response format', () => {
+        // Ensure parseApiResponse is not mocked for this test
+        if (comparator.parseApiResponse && comparator.parseApiResponse.mockRestore) {
+            comparator.parseApiResponse.mockRestore();
+        }
+        
+        const mockCollectionResponse = {
+            data: [
+                {
+                    quantity: 2,
+                    card: {
+                        name: 'Lightning Bolt',
+                        set: 'M10',
+                        cn: '133',
+                        isFoil: false
+                    }
+                },
+                {
+                    quantity: 1,
+                    card: {
+                        name: 'Counterspell',
+                        set: 'M10',
+                        cn: '50',
+                        isFoil: true
+                    }
+                }
+            ]
+        };
+
+        const result = comparator.parseApiResponse(mockCollectionResponse, 'collection');
+        
+        expect(result).toContain('2 Lightning Bolt (M10) 133');
+        expect(result).toContain('1 Counterspell (M10) 50 *F*');
+    });
+
     // Run this test first to avoid interference from other tests
     test('should parse simple binder response', () => {
         // Ensure parseApiResponse is not mocked for this test

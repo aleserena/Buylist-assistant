@@ -1,5 +1,8 @@
 // Jest setup file for DOM testing
 
+// Load the script file to ensure coverage collection
+require('../script.js');
+
 // Mock fetch globally
 global.fetch = jest.fn();
 
@@ -151,13 +154,6 @@ document.body.innerHTML = `
     </div>
   </div>
 `;
-
-// Load the script
-const fs = require('fs');
-const path = require('path');
-
-const scriptContent = fs.readFileSync(path.join(__dirname, '../script.js'), 'utf8');
-eval(scriptContent);
 
 // Trigger DOMContentLoaded event
 document.dispatchEvent(new Event('DOMContentLoaded')); 

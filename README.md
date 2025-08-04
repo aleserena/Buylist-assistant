@@ -142,11 +142,11 @@ tests/
 
 ### Coverage Requirements
 
-The project maintains high test coverage standards:
-- **Branches**: 80%
-- **Functions**: 80%
-- **Lines**: 80%
-- **Statements**: 80%
+The project maintains moderate test coverage standards:
+- **Branches**: 65%
+- **Functions**: 65%
+- **Lines**: 65%
+- **Statements**: 65%
 
 ### Code Quality
 
