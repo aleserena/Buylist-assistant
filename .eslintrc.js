@@ -1,0 +1,82 @@
+module.exports = {
+    env: {
+        browser: true,
+        es2021: true,
+        node: true,
+        jest: true
+    },
+    extends: [
+        'eslint:recommended'
+    ],
+    parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module'
+    },
+    rules: {
+        'indent': ['error', 4],
+        'linebreak-style': ['error', 'unix'],
+        'quotes': ['error', 'single'],
+        'semi': ['error', 'always'],
+        'no-unused-vars': ['warn', { 'argsIgnorePattern': '^_' }],
+        'no-console': 'warn',
+        'prefer-const': 'error',
+        'no-var': 'error',
+        'object-shorthand': 'error',
+        'prefer-template': 'error',
+        'template-curly-spacing': 'error',
+        'arrow-spacing': 'error',
+        'no-duplicate-imports': 'error',
+        'no-useless-constructor': 'error',
+        'no-useless-rename': 'error',
+        'prefer-destructuring': ['error', {
+            'array': false,
+            'object': true
+        }],
+        'prefer-rest-params': 'error',
+        'prefer-spread': 'error',
+        'no-useless-concat': 'error',
+        'no-useless-escape': 'error',
+        'no-useless-return': 'error',
+        'no-void': 'error',
+        'prefer-promise-reject-errors': 'error',
+        'no-throw-literal': 'error',
+        'no-unmodified-loop-condition': 'error',
+        'no-unreachable': 'error',
+        'no-unreachable-loop': 'error',
+        'no-unsafe-negation': 'error',
+        'no-unsafe-optional-chaining': 'error',
+        'no-useless-backreference': 'error',
+        'valid-typeof': 'error',
+        'no-constant-condition': 'warn',
+        'no-empty': 'warn',
+        'no-extra-boolean-cast': 'error',
+        'no-extra-semi': 'error',
+        'no-func-assign': 'error',
+        'no-import-assign': 'error',
+        'no-obj-calls': 'error',
+        'no-prototype-builtins': 'error',
+        'no-redeclare': 'error',
+        'no-setter-return': 'error',
+        'no-undef': 'error',
+        'no-unexpected-multiline': 'error',
+        'no-unused-labels': 'error',
+        'no-useless-catch': 'error',
+        'no-useless-escape': 'error',
+        'require-await': 'error',
+        'use-isnan': 'error',
+        'valid-jsdoc': 'off',
+        'yoda': 'error'
+    },
+    globals: {
+        'window': 'readonly',
+        'document': 'readonly',
+        'console': 'readonly',
+        'fetch': 'readonly',
+        'alert': 'readonly',
+        'confirm': 'readonly',
+        'setTimeout': 'readonly',
+        'clearTimeout': 'readonly',
+        'setInterval': 'readonly',
+        'clearInterval': 'readonly'
+    }
+}; 

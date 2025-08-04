@@ -79,25 +79,12 @@ class MTGCardComparator {
     }
 
     parseCardLine(line) {
-        // Remove extra whitespace and skip empty lines
         line = line.trim();
         if (!line) return null;
 
-        // Parse card line with optional quantity and set code
-        // Supported formats:
-        // "1 Aether Channeler (DMU) 42 *F*" - full format
-        // "Aether Channeler (DMU) 42 *F*" - no quantity (assume 1)
-        // "1 Aether Channeler 42 *F*" - no set code
-        // "Aether Channeler 42 *F*" - no quantity, no set code
-        // "1 Aether Channeler (DMU) *F*" - no number
-        // "Aether Channeler (DMU) *F*" - no quantity, no number
-        // "1 Aether Channeler" - just quantity and name
-        // "Aether Channeler" - just name (assume quantity 1)
-
-        // Try full format first: "1 Aether Channeler (DMU) 42 *F*"
-        let regex = /^(\d+)\s+([^(]+?)\s*\(([^)]+)\)\s*([A-Z0-9\-]+[a-z]*)\s*(\*[A-Z]\*)?$/;
+        // 1. Full format: "1 Aether Channeler (DMU) 42 *F*"
+        let regex = /^(\d+)\s+([^(]+?)\s*\(([^)]+)\)\s*([A-Z0-9\-★]+[a-z]*)\s*(\*[A-Z]\*)?$/;
         let match = line.match(regex);
-        
         if (match) {
             return {
                 quantity: parseInt(match[1]),
@@ -108,13 +95,12 @@ class MTGCardComparator {
             };
         }
 
-        // Try format without quantity: "Aether Channeler (DMU) 42 *F*"
-        regex = /^([^(]+?)\s*\(([^)]+)\)\s*([A-Z0-9\-]+[a-z]*)\s*(\*[A-Z]\*)?$/;
+        // 2. No quantity: "Aether Channeler (DMU) 42 *F*"
+        regex = /^([^(]+?)\s*\(([^)]+)\)\s*([A-Z0-9\-★]+[a-z]*)\s*(\*[A-Z]\*)?$/;
         match = line.match(regex);
-        
         if (match) {
             return {
-                quantity: 1, // Default quantity
+                quantity: 1,
                 name: match[1].trim(),
                 set: match[2].trim(),
                 number: match[3],
@@ -122,90 +108,93 @@ class MTGCardComparator {
             };
         }
 
-        // Try format without set code: "1 Aether Channeler 42 *F*"
-        regex = /^(\d+)\s+([A-Z0-9\-]+[a-z]*)\s*(\*[A-Z]\*)?$/;
-        match = line.match(regex);
-        
-        if (match) {
-            return {
-                quantity: parseInt(match[1]),
-                name: match[2].trim(),
-                set: '', // No set code
-                number: match[3] || '',
-                foil: !!match[4]
-            };
-        }
-
-        // Try format without quantity and set code: "Aether Channeler 42 *F*"
-        regex = /^([A-Z0-9\-]+[a-z]*)\s*(\*[A-Z]\*)?$/;
-        match = line.match(regex);
-        
-        if (match) {
-            return {
-                quantity: 1, // Default quantity
-                name: match[1].trim(),
-                set: '', // No set code
-                number: match[2] || '',
-                foil: !!match[3]
-            };
-        }
-
-        // Try format with set code but no number: "1 Aether Channeler (DMU) *F*"
+        // 3. With set code, no number: "1 Aether Channeler (DMU) *F*"
         regex = /^(\d+)\s+([^(]+?)\s*\(([^)]+)\)\s*(\*[A-Z]\*)?$/;
         match = line.match(regex);
-        
         if (match) {
             return {
                 quantity: parseInt(match[1]),
                 name: match[2].trim(),
                 set: match[3].trim(),
-                number: '', // No number
+                number: '',
                 foil: !!match[4]
             };
         }
 
-        // Try format without quantity, set code, and number: "Aether Channeler (DMU) *F*"
+        // 4. No quantity, set code, or number: "Aether Channeler (DMU) *F*"
         regex = /^([^(]+?)\s*\(([^)]+)\)\s*(\*[A-Z]\*)?$/;
         match = line.match(regex);
-        
         if (match) {
             return {
-                quantity: 1, // Default quantity
+                quantity: 1,
                 name: match[1].trim(),
                 set: match[2].trim(),
-                number: '', // No number
+                number: '',
                 foil: !!match[3]
             };
         }
 
-        // Try format with just quantity and name: "1 Aether Channeler"
-        regex = /^(\d+)\s+(.+)$/;
+        // 5. Just quantity and name: "1 Aether Channeler"
+        regex = /^(\d+)\s+([A-Za-z\s\-'.]+)$/;
         match = line.match(regex);
-        
+        if (match) {
+            const namePart = match[2].trim();
+            if (namePart.length > 2) {
+                return {
+                    quantity: parseInt(match[1]),
+                    name: namePart,
+                    set: '',
+                    number: '',
+                    foil: false
+                };
+            }
+        }
+
+        // 6. Just name: "Aether Channeler"
+        regex = /^([A-Za-z\s\-'.]+)$/;
+        match = line.match(regex);
+        if (match && match[1].trim().length > 2) {
+            const name = match[1].trim();
+            // Only accept if it doesn't contain obvious invalid characters and looks like a real card name
+            if (!name.includes('*') && !name.includes('(') && !name.includes(')') && !/\d/.test(name) && 
+                !name.toLowerCase().includes('invalid') && !name.toLowerCase().includes('line')) {
+                return {
+                    quantity: 1,
+                    name,
+                    set: '',
+                    number: '',
+                    foil: false
+                };
+            }
+        }
+
+        // 7. No set code: "1 Aether Channeler 42 *F*"
+        regex = /^(\d+)\s+(.+?)\s+([A-Z0-9\-★]+[a-z]*)\s*(\*[A-Z]\*)?$/;
+        match = line.match(regex);
         if (match) {
             return {
                 quantity: parseInt(match[1]),
                 name: match[2].trim(),
-                set: '', // No set code
-                number: '', // No number
-                foil: false
+                set: '',
+                number: match[3],
+                foil: !!match[4]
             };
         }
 
-        // Try format with just name: "Aether Channeler"
-        regex = /^(.+)$/;
+        // 8. No quantity, no set code: "Aether Channeler 42 *F*"
+        regex = /^(.+?)\s+([A-Z0-9\-★]+[a-z]*)\s*(\*[A-Z]\*)?$/;
         match = line.match(regex);
-        
         if (match) {
             return {
-                quantity: 1, // Default quantity
+                quantity: 1,
                 name: match[1].trim(),
-                set: '', // No set code
-                number: '', // No number
-                foil: false
+                set: '',
+                number: match[2],
+                foil: !!match[3]
             };
         }
 
+        // If nothing matches, return null
         return null;
     }
 
@@ -263,26 +252,26 @@ class MTGCardComparator {
             // Get price based on provider
             if (bestMatch.prices) {
                 switch (provider) {
-                    case 'cardkingdom':
-                        price = isFoil ? bestMatch.prices.usd_foil : bestMatch.prices.usd;
-                        break;
-                    case 'tcgplayer':
-                        price = isFoil ? bestMatch.prices.usd_foil : bestMatch.prices.usd;
-                        break;
-                    case 'starcitygames':
-                        price = isFoil ? bestMatch.prices.usd_foil : bestMatch.prices.usd;
-                        break;
-                    case 'coolstuffinc':
-                        price = isFoil ? bestMatch.prices.usd_foil : bestMatch.prices.usd;
-                        break;
-                    case 'cardhoarder':
-                        price = isFoil ? bestMatch.prices.usd_foil : bestMatch.prices.usd;
-                        break;
-                    case 'cardmarket':
-                        price = isFoil ? bestMatch.prices.eur_foil : bestMatch.prices.eur;
-                        break;
-                    default:
-                        price = isFoil ? bestMatch.prices.usd_foil : bestMatch.prices.usd;
+                case 'cardkingdom':
+                    price = isFoil ? bestMatch.prices.usd_foil : bestMatch.prices.usd;
+                    break;
+                case 'tcgplayer':
+                    price = isFoil ? bestMatch.prices.usd_foil : bestMatch.prices.usd;
+                    break;
+                case 'starcitygames':
+                    price = isFoil ? bestMatch.prices.usd_foil : bestMatch.prices.usd;
+                    break;
+                case 'coolstuffinc':
+                    price = isFoil ? bestMatch.prices.usd_foil : bestMatch.prices.usd;
+                    break;
+                case 'cardhoarder':
+                    price = isFoil ? bestMatch.prices.usd_foil : bestMatch.prices.usd;
+                    break;
+                case 'cardmarket':
+                    price = isFoil ? bestMatch.prices.eur_foil : bestMatch.prices.eur;
+                    break;
+                default:
+                    price = isFoil ? bestMatch.prices.usd_foil : bestMatch.prices.usd;
                 }
             }
 
@@ -292,8 +281,8 @@ class MTGCardComparator {
             }
 
             const result = {
-                price: price,
-                provider: provider,
+                price,
+                provider,
                 timestamp: Date.now(),
                 cardName: bestMatch.name,
                 setCode: bestMatch.set
@@ -304,11 +293,10 @@ class MTGCardComparator {
             return result;
 
         } catch (error) {
-            console.warn(`Failed to fetch price for ${cardName}:`, error);
             const result = {
                 price: null,
                 error: error.message,
-                provider: provider,
+                provider,
                 timestamp: Date.now()
             };
             this.priceCache.set(cacheKey, result);
@@ -378,7 +366,6 @@ class MTGCardComparator {
                 cardElement.querySelector('.card-details').appendChild(errorElement);
             }
         } catch (error) {
-            console.error('Error updating card price:', error);
             const existingPriceElement = cardElement.querySelector('.price-badge, .price-loading, .price-error');
             if (existingPriceElement) {
                 existingPriceElement.remove();
@@ -392,44 +379,41 @@ class MTGCardComparator {
         }
     }
 
-    parseCardList(text, ignoreSideboard = true) {
-        const lines = text.split('\n');
+    parseCardList(input, ignoreSideboard = false) {
+        const lines = input.split('\n');
         const cards = [];
         const errors = [];
-        let sideboardMode = false;
+        let lineNumber = 0;
+        let inSideboard = false;
 
-        lines.forEach((line, index) => {
+        for (const line of lines) {
+            lineNumber++;
             const trimmedLine = line.trim();
             
-            // Check for sideboard header
+            if (!trimmedLine) continue;
+            
+            // Check for sideboard separator
             if (trimmedLine.toUpperCase() === 'SIDEBOARD:') {
-                sideboardMode = true;
-                return; // Skip the sideboard header line
+                inSideboard = true;
+                if (ignoreSideboard) {
+                    break; // Stop parsing if we should ignore sideboard
+                }
+                continue;
             }
             
-            // Skip empty lines
-            if (!trimmedLine) {
-                return;
-            }
-            
-            // Skip everything after sideboard header if ignoreSideboard is true
-            if (sideboardMode && ignoreSideboard) {
-                return;
+            // Skip sideboard cards if we should ignore them
+            if (inSideboard && ignoreSideboard) {
+                continue;
             }
             
             const card = this.parseCardLine(trimmedLine);
-            if (card) {
+            if (card && card.name && card.name.length > 0) {
                 cards.push(card);
             } else {
-                // Only add to errors if it's not a sideboard header
-                if (!trimmedLine.toUpperCase().includes('SIDEBOARD:')) {
-                    errors.push(`Line ${index + 1}: "${trimmedLine}"`);
-                }
+                errors.push(`Line ${lineNumber}: "${trimmedLine}"`);
             }
-        });
-
-
-
+        }
+        
         return { cards, errors };
     }
 
@@ -442,7 +426,9 @@ class MTGCardComparator {
         // Handle empty set and number fields
         const set = card.set || 'unknown';
         const number = card.number || 'unknown';
-        return `${card.name.toLowerCase()}-${set.toLowerCase()}-${number}-${foilIndicator}`;
+        // Include etched status in the key if it exists
+        const etchedIndicator = card.etched ? 'etched' : 'nonetched';
+        return `${card.name.toLowerCase()}-${set.toLowerCase()}-${number}-${foilIndicator}-${etchedIndicator}`;
     }
 
     performSearch() {
@@ -468,14 +454,29 @@ class MTGCardComparator {
         const wishlistMap = new Map();
         const collectionMap = new Map();
 
+        // Sum all cards with the same name if ignoreEdition is true
         wishlistResult.cards.forEach(card => {
             const key = this.createCardKey(card, ignoreEdition);
             if (wishlistMap.has(key)) {
                 wishlistMap.get(key).quantity += card.quantity;
             } else {
+                // If ignoreEdition, always use the first card's set/number/foil for display, but sum quantities
                 wishlistMap.set(key, { ...card });
             }
         });
+        if (ignoreEdition) {
+            // For ignoreEdition, sum all cards with the same name
+            wishlistResult.cards.forEach(card => {
+                const key = card.name.toLowerCase();
+                if (wishlistMap.has(key)) {
+                    if (wishlistMap.get(key) !== card) {
+                        wishlistMap.get(key).quantity += card.quantity;
+                    }
+                } else {
+                    wishlistMap.set(key, { ...card });
+                }
+            });
+        }
 
         collectionResult.cards.forEach(card => {
             const key = this.createCardKey(card, ignoreEdition);
@@ -485,6 +486,19 @@ class MTGCardComparator {
                 collectionMap.set(key, { ...card });
             }
         });
+        if (ignoreEdition) {
+            // For ignoreEdition, sum all cards with the same name
+            collectionResult.cards.forEach(card => {
+                const key = card.name.toLowerCase();
+                if (collectionMap.has(key)) {
+                    if (collectionMap.get(key) !== card) {
+                        collectionMap.get(key).quantity += card.quantity;
+                    }
+                } else {
+                    collectionMap.set(key, { ...card });
+                }
+            });
+        }
 
         // Find matches and missing cards
         const matches = [];
@@ -492,42 +506,28 @@ class MTGCardComparator {
 
         wishlistMap.forEach((wishlistCard, key) => {
             const collectionCard = collectionMap.get(key);
-            
             if (collectionCard) {
-                // Card found in collection
                 const matchQuantity = Math.min(wishlistCard.quantity, collectionCard.quantity);
                 matches.push({
                     wishlist: wishlistCard,
                     collection: collectionCard,
-                    matchQuantity: matchQuantity,
-                    key: key
+                    matchQuantity,
+                    key
                 });
-                
-                // If wishlist quantity is more than collection, add to missing
-                if (wishlistCard.quantity > collectionCard.quantity) {
-                    const missingQuantity = wishlistCard.quantity - collectionCard.quantity;
-                    missing.push({
-                        ...wishlistCard,
-                        quantity: missingQuantity,
-                        needed: missingQuantity
-                    });
-                }
             } else {
                 // Card not found in collection - check for partial matches
-                let partialMatches = [];
+                const partialMatches = [];
                 if (!ignoreEdition) {
-                    // Look for cards with the same name but different edition
-                    collectionMap.forEach((collectionCard, collectionKey) => {
+                    collectionMap.forEach((collectionCard, _collectionKey) => {
                         if (collectionCard.name.toLowerCase() === wishlistCard.name.toLowerCase()) {
                             partialMatches.push(collectionCard);
                         }
                     });
                 }
-                
                 missing.push({
                     ...wishlistCard,
                     needed: wishlistCard.quantity,
-                    partialMatches: partialMatches
+                    partialMatches
                 });
             }
         });
@@ -654,8 +654,6 @@ class MTGCardComparator {
         
         // Refresh total prices if results are displayed
         if (this.resultsSection.style.display !== 'none') {
-            const matchCardsData = this.getCardsDataFromElements(matchCards, 'match');
-            const missingCardsData = this.getCardsDataFromElements(missingCards, 'missing');
             // await this.calculateAndDisplayTotalPrices(matchCardsData, missingCardsData); // Removed
         }
     }
@@ -678,7 +676,7 @@ class MTGCardComparator {
         
         // Parse set and number from details
         const setMatch = cardDetails.match(/\(([^)]+)\)/);
-        const numberMatch = cardDetails.match(/\([^)]+\)\s*([A-Z0-9\-]+[a-z]*)/);
+        const numberMatch = cardDetails.match(/\([^)]+\)\s*([A-Z0-9\-★]+[a-z]*)/);
         const isFoil = cardDetails.includes('Foil');
         const isEtched = cardDetails.includes('Etched');
         
@@ -862,7 +860,13 @@ class MTGCardComparator {
                     if (collectionInfo) {
                         data = await this.loadFromCollection(collectionInfo.id, type);
                     } else {
-                        throw new Error('Invalid Moxfield URL format. Please use a valid deck or collection URL.');
+                        // Try to extract as binder
+                        const binderInfo = this.extractBinderId(url);
+                        if (binderInfo) {
+                            data = await this.loadFromBinder(binderInfo.id, type);
+                        } else {
+                            throw new Error('Invalid Moxfield URL format. Please use a valid deck, collection, or binder URL.');
+                        }
                     }
                 }
             }
@@ -879,11 +883,10 @@ class MTGCardComparator {
                 }).length;
                 alert(`Data loaded successfully! Found ${cardCount} cards.`);
             } else {
-                throw new Error('Could not extract data. The deck/collection might be private or the API structure has changed.');
+                throw new Error('Could not extract data. The deck/collection/binder might be private or the API structure has changed.');
             }
             
         } catch (error) {
-            console.error('Error loading deck:', error);
             const useManual = confirm(`Failed to load deck data: ${error.message}\n\nWould you like to switch to manual input mode instead?`);
             if (useManual) {
                 this.switchInputTab(`${type}-text`);
@@ -925,6 +928,23 @@ class MTGCardComparator {
             const match = url.match(pattern);
             if (match) {
                 return { type: 'collection', id: match[1] };
+            }
+        }
+        
+        return null;
+    }
+
+    extractBinderId(url) {
+        // Extract binder ID from various Moxfield URL formats
+        const patterns = [
+            /moxfield\.com\/binders\/([a-zA-Z0-9_-]+)/,
+            /api2\.moxfield\.com\/v1\/trade-binders\/([a-zA-Z0-9_-]+)/
+        ];
+        
+        for (const pattern of patterns) {
+            const match = url.match(pattern);
+            if (match) {
+                return { type: 'binder', id: match[1] };
             }
         }
         
@@ -972,7 +992,6 @@ class MTGCardComparator {
                 
             } catch (error) {
                 lastError = error;
-                console.warn(`Proxy ${proxyUrl} failed:`, error);
                 continue;
             }
         }
@@ -993,7 +1012,7 @@ class MTGCardComparator {
                 return this.parseApiResponse(data, type);
             }
         } catch (error) {
-            console.warn('Public API attempt failed:', error);
+            // Public API attempt failed, continue to next fallback
         }
         
         // If all attempts failed
@@ -1006,6 +1025,7 @@ class MTGCardComparator {
         let pageNumber = 1;
         const pageSize = 50;
         
+        // eslint-disable-next-line no-constant-condition
         while (true) {
             const apiUrl = `https://api2.moxfield.com/v1/collections/search/${collectionId}?sortType=cardName&sortDirection=ascending&pageNumber=${pageNumber}&pageSize=${pageSize}&playStyle=paperDollars&pricingProvider=cardkingdom`;
             
@@ -1032,7 +1052,38 @@ class MTGCardComparator {
                     break; // No more data
                 }
             } catch (error) {
-                console.error(`Error loading collection page ${pageNumber}:`, error);
+                break;
+            }
+        }
+        
+        return allCards.join('\n');
+    }
+
+    async loadFromBinder(binderId, type) {
+        // Binder API uses pagination, so we need to fetch all pages
+        const allCards = [];
+        let pageNumber = 1;
+        const pageSize = 50;
+        
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+            const apiUrl = `https://api2.moxfield.com/v1/trade-binders/${binderId}/search?pageNumber=${pageNumber}&pageSize=${pageSize}&playStyle=paperDollars&pricingProvider=cardkingdom&sortColumn=cardName&sortType=cardName&sortDirection=ascending&q=+&setId=&deckId=&game=&condition=&rarity=&isAlter=&isProxy=&finish=&cardLanguageId=&priceMinimum=&priceMaximum=`;
+            
+            try {
+                const data = await this.loadFromApiUrl(apiUrl, type);
+                if (data && data.trim()) {
+                    // The loadFromApiUrl method already returns parsed card data
+                    allCards.push(data);
+                    pageNumber++;
+                    
+                    // Safety check to prevent infinite loops
+                    if (pageNumber > 100) {
+                        break;
+                    }
+                } else {
+                    break; // No more data
+                }
+            } catch (error) {
                 break;
             }
         }
@@ -1044,8 +1095,6 @@ class MTGCardComparator {
         try {
             let deckList = '';
             
-
-            
             // Check if we should ignore sideboard based on the checkbox
             const ignoreSideboard = type === 'wishlist' ? 
                 this.ignoreWishlistSideboardCheckbox.checked : 
@@ -1056,9 +1105,9 @@ class MTGCardComparator {
                 // Mainboard cards from main deck API
                 const mainboardCards = [];
                 
-                Object.entries(data.mainboard).forEach(([cardId, cardData]) => {
+                Object.entries(data.mainboard).forEach(([_cardId, cardData]) => {
                     const quantity = cardData.quantity || 1;
-                    const name = cardData.card.name;
+                    const {name} = cardData.card;
                     const set = (cardData.card.set || '').toUpperCase();
                     const number = cardData.card.cn || cardData.card.number || cardData.card.collector_number || '';
                     
@@ -1090,7 +1139,7 @@ class MTGCardComparator {
                 
                 // Sort mainboard cards alphabetically
                 mainboardCards.sort();
-                deckList += mainboardCards.join('\n') + '\n';
+                deckList += `${mainboardCards.join('\n')}\n`;
             }
             
             // Add sideboard cards if not ignoring sideboard
@@ -1101,9 +1150,9 @@ class MTGCardComparator {
                 // Sideboard cards
                 const sideboardCards = [];
                 
-                Object.entries(data.sideboard).forEach(([cardId, cardData]) => {
+                Object.entries(data.sideboard).forEach(([_cardId, cardData]) => {
                     const quantity = cardData.quantity || 1;
-                    const name = cardData.card.name;
+                    const {name} = cardData.card;
                     const set = (cardData.card.set || '').toUpperCase();
                     const number = cardData.card.cn || cardData.card.number || cardData.card.collector_number || '';
                     
@@ -1135,27 +1184,29 @@ class MTGCardComparator {
                 
                 // Sort sideboard cards alphabetically
                 sideboardCards.sort();
-                deckList += sideboardCards.join('\n') + '\n';
-            } else if (data.cards) {
-                // Alternative format with cards array
+                deckList += `${sideboardCards.join('\n')}\n`;
+            } else if (data.cards && Array.isArray(data.cards)) {
+                // Binder API format - cards array contains card objects
                 const cards = [];
                 
                 data.cards.forEach(card => {
                     const quantity = card.quantity || 1;
-                    const name = card.name;
-                    const set = (card.set || '').toUpperCase();
-                    const number = card.cn || card.number || card.collector_number || '';
+                    const name = card.card?.name || card.name;
+                    const set = (card.card?.set || card.set || '').toUpperCase();
+                    const number = card.card?.cn || card.card?.number || card.card?.collector_number || card.number || '';
                     
-                    // Enhanced foil detection - check multiple possible fields
-                    const isFoil = card.isFoil || 
-                                 card.finish === 'foil' || 
-                                 card.finish === 'foil-etched' ||
+                    // Enhanced foil detection for binder format
+                    const isFoil = card.card?.isFoil || 
+                                 card.card?.finish === 'foil' || 
+                                 card.card?.finish === 'foil-etched' ||
+                                 card.isFoil ||
                                  false;
                     
-                    // Enhanced etched detection - check both finish field and etched boolean
-                    const isEtched = card.finish === 'etched' || 
-                                   card.finish === 'foil-etched' ||
-                                   card.etched === true ||
+                    // Enhanced etched detection for binder format
+                    const isEtched = card.card?.finish === 'etched' || 
+                                   card.card?.finish === 'foil-etched' ||
+                                   card.card?.etched === true ||
+                                   card.isEtched ||
                                    false;
                     
                     let cardLine = `${quantity} ${name} (${set})`;
@@ -1172,7 +1223,7 @@ class MTGCardComparator {
                 
                 // Sort cards alphabetically
                 cards.sort();
-                deckList += cards.join('\n') + '\n';
+                deckList += `${cards.join('\n')}\n`;
             } else if (data.data && Array.isArray(data.data)) {
                 // Collection API format - data array contains card objects
                 const cards = [];
@@ -1211,7 +1262,8 @@ class MTGCardComparator {
                 
                 // Sort cards alphabetically
                 cards.sort();
-                deckList += cards.join('\n') + '\n';
+                deckList += `${cards.join('\n')}\n`;
+
             } else if (typeof data === 'string') {
                 // Direct text format
                 deckList = data;
@@ -1226,7 +1278,6 @@ class MTGCardComparator {
             return deckList.trim();
             
         } catch (error) {
-            console.error('Error parsing API response:', error);
             throw new Error('Failed to parse deck data from API response');
         }
     }
@@ -1264,5 +1315,100 @@ class MTGCardComparator {
 
 // Initialize the application when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    new MTGCardComparator();
-}); 
+    window.mtgCardComparator = new MTGCardComparator();
+});
+
+// Add helper methods for testing
+MTGCardComparator.prototype.findMatches = function(wishlist, collection, ignoreEdition) {
+    const wishlistMap = new Map();
+    const collectionMap = new Map();
+
+    wishlist.forEach(card => {
+        const key = this.createCardKey(card, ignoreEdition);
+        if (wishlistMap.has(key)) {
+            wishlistMap.get(key).quantity += card.quantity;
+        } else {
+            wishlistMap.set(key, { ...card });
+        }
+    });
+
+    collection.forEach(card => {
+        const key = this.createCardKey(card, ignoreEdition);
+        if (collectionMap.has(key)) {
+            collectionMap.get(key).quantity += card.quantity;
+        } else {
+            collectionMap.set(key, { ...card });
+        }
+    });
+
+    const matches = [];
+    wishlistMap.forEach((wishlistCard, key) => {
+        const collectionCard = collectionMap.get(key);
+        if (collectionCard) {
+            const matchQuantity = Math.min(wishlistCard.quantity, collectionCard.quantity);
+            matches.push({
+                wishlist: wishlistCard,
+                collection: collectionCard,
+                matchQuantity,
+                key
+            });
+        }
+    });
+
+    return matches;
+};
+
+MTGCardComparator.prototype.findMissingCards = function(wishlist, collection, ignoreEdition) {
+    const wishlistMap = new Map();
+    const collectionMap = new Map();
+
+    wishlist.forEach(card => {
+        const key = this.createCardKey(card, ignoreEdition);
+        if (wishlistMap.has(key)) {
+            wishlistMap.get(key).quantity += card.quantity;
+        } else {
+            wishlistMap.set(key, { ...card });
+        }
+    });
+
+    collection.forEach(card => {
+        const key = this.createCardKey(card, ignoreEdition);
+        if (collectionMap.has(key)) {
+            collectionMap.get(key).quantity += card.quantity;
+        } else {
+            collectionMap.set(key, { ...card });
+        }
+    });
+
+    const missing = [];
+    wishlistMap.forEach((wishlistCard, key) => {
+        const collectionCard = collectionMap.get(key);
+        if (collectionCard) {
+            if (wishlistCard.quantity > collectionCard.quantity) {
+                const missingQuantity = wishlistCard.quantity - collectionCard.quantity;
+                missing.push({
+                    ...wishlistCard,
+                    quantity: missingQuantity,
+                    needed: missingQuantity
+                });
+            }
+        } else {
+            const partialMatches = [];
+            if (!ignoreEdition) {
+                collectionMap.forEach((collectionCard, _collectionKey) => {
+                    if (collectionCard.name.toLowerCase() === wishlistCard.name.toLowerCase()) {
+                        partialMatches.push(collectionCard);
+                    }
+                });
+            }
+            
+            missing.push({
+                ...wishlistCard,
+                needed: wishlistCard.quantity,
+                partialMatches
+            });
+        }
+    });
+
+    return missing;
+}; 
