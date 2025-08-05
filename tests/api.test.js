@@ -12,18 +12,10 @@ describe('API Functionality Tests', () => {
         // Reset fetch mock
         global.fetch.mockClear();
         // Reset any mocked methods on the comparator
-        if (comparator.parseApiResponse && comparator.parseApiResponse.mockRestore) {
-            comparator.parseApiResponse.mockRestore();
-        }
     });
 
     // Run these tests first to avoid interference from other tests
     test('should handle string data format', () => {
-        // Ensure parseApiResponse is not mocked for this test
-        if (comparator.parseApiResponse && comparator.parseApiResponse.mockRestore) {
-            comparator.parseApiResponse.mockRestore();
-        }
-        
         const mockStringData = '1 Lightning Bolt (M10) 133\n2 Counterspell (M10) 50';
         
         const result = comparator.parseApiResponse(mockStringData, 'collection');
@@ -32,11 +24,6 @@ describe('API Functionality Tests', () => {
     });
 
     test('should handle unknown data format with findCardsInResponse', () => {
-        // Ensure parseApiResponse is not mocked for this test
-        if (comparator.parseApiResponse && comparator.parseApiResponse.mockRestore) {
-            comparator.parseApiResponse.mockRestore();
-        }
-        
         const mockUnknownData = {
             someNestedObject: {
                 name: 'Lightning Bolt',
@@ -53,11 +40,6 @@ describe('API Functionality Tests', () => {
     });
 
     test('should handle collection API response format', () => {
-        // Ensure parseApiResponse is not mocked for this test
-        if (comparator.parseApiResponse && comparator.parseApiResponse.mockRestore) {
-            comparator.parseApiResponse.mockRestore();
-        }
-        
         const mockCollectionResponse = {
             data: [
                 {
@@ -89,11 +71,6 @@ describe('API Functionality Tests', () => {
 
     // Run this test first to avoid interference from other tests
     test('should parse simple binder response', () => {
-        // Ensure parseApiResponse is not mocked for this test
-        if (comparator.parseApiResponse && comparator.parseApiResponse.mockRestore) {
-            comparator.parseApiResponse.mockRestore();
-        }
-        
         const mockResponse = {
             cards: [
                 {
