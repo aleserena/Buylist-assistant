@@ -125,7 +125,8 @@ describe('PriceService Comprehensive Tests', () => {
 
             const result = await priceService.fetchCardPrice('Lightning Bolt', 'M10', true, false, 'tcgplayer');
 
-            expect(result.price).toBe('1.50');
+            // Foil should prefer foil-specific field
+            expect(result.price).toBe('5.00');
             expect(result.cardName).toBe('Lightning Bolt');
             expect(result.provider).toBe('TCGPlayer');
         });
@@ -151,7 +152,8 @@ describe('PriceService Comprehensive Tests', () => {
 
             const result = await priceService.fetchCardPrice('Lightning Bolt', 'M10', false, true, 'tcgplayer');
 
-            expect(result.price).toBe('1.50');
+            // Etched should prefer etched-specific field
+            expect(result.price).toBe('3.00');
             expect(result.cardName).toBe('Lightning Bolt');
             expect(result.provider).toBe('TCGPlayer');
         });
@@ -480,7 +482,8 @@ describe('PriceService Comprehensive Tests', () => {
             const foil = await priceService.fetchCardPrice('Lightning Bolt', 'M10', true, false, 'tcgplayer');
 
             expect(regular.price).toBe('1.50');
-            expect(foil.price).toBe('1.50');
+            // Foil should pick the foil price
+            expect(foil.price).toBe('5.00');
 
             // Should make two API calls for different cache keys
             expect(global.fetch).toHaveBeenCalledTimes(2);

@@ -157,27 +157,6 @@ export class ApiClient {
     }
 
     /**
-     * Fetch data from API URL and parse, with CORS-friendly fallback
-     * @param {string} apiUrl - The API URL to fetch
-     * @param {string} type - The type of data (wishlist/collection)
-     * @returns {Promise<string|Object>} - Parsed card list string, or an object with { apiUrl, cards: '' } when manual input is needed
-     */
-    async loadFromApiUrl(apiUrl, type) {
-        try {
-            const response = await fetch(apiUrl);
-            if (!response.ok) {
-                // Defer to manual flow when response not OK (e.g., CORS)
-                return { apiUrl, cards: '' };
-            }
-            const data = await response.json();
-            return this.parseApiResponse(data, type);
-        } catch (_err) {
-            // Likely CORS/network error in browser; allow manual paste flow
-            return { apiUrl, cards: '' };
-        }
-    }
-
-    /**
      * Load binder data from Moxfield API with pagination
      * @param {string} binderId - The binder ID
      * @param {string} type - The type of data

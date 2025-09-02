@@ -277,7 +277,7 @@ export class UIManager {
         });
         const csv = rows.map(r => r.map(v => {
             const s = String(v);
-            return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+            return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
         }).join(',')).join('\n');
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
@@ -342,8 +342,8 @@ export class UIManager {
             
             const quantityForDisplay = (type === 'match' && typeof card.quantity === 'number') ? card.quantity : displayCard.quantity;
             // Hidden text flags for compatibility and accessibility
-            const hiddenFoil = displayCard.foil ? '<span class="visually-hidden">*F*</span>' : '';
-            const hiddenEtched = displayCard.etched ? '<span class="visually-hidden">*E*</span>' : '';
+            const hiddenFoil = displayCard.foil ? ' <span class="visually-hidden">*F*</span>' : '';
+            const hiddenEtched = displayCard.etched ? ' <span class="visually-hidden">*E*</span>' : '';
             let cardHtml = `
                 <span class="card-quantity">${quantityForDisplay}x</span>
                 <span class="card-name">${displayCard.name}${setInfo}${numberInfo}${hiddenFoil}${hiddenEtched}</span>
@@ -358,8 +358,8 @@ export class UIManager {
                 card.partialMatches.forEach(partialMatch => {
                     const partialSetInfo = partialMatch.set ? ` (${partialMatch.set})` : '';
                     const partialNumberInfo = partialMatch.number ? ` ${partialMatch.number}` : '';
-                    const hiddenPF = partialMatch.foil ? '<span class="visually-hidden">*F*</span>' : '';
-                    const hiddenPE = partialMatch.etched ? '<span class="visually-hidden">*E*</span>' : '';
+                    const hiddenPF = partialMatch.foil ? ' <span class="visually-hidden">*F*</span>' : '';
+                    const hiddenPE = partialMatch.etched ? ' <span class="visually-hidden">*E*</span>' : '';
                     const partialBadges = `
                         <span class="card-badges">
                             ${partialMatch.foil ? `
@@ -483,7 +483,9 @@ export class UIManager {
         }
         
         const quantity = parseInt(quantityElement.textContent.replace('x', ''));
-        const nameText = nameElement.textContent;
+        const rawText = nameElement.textContent || '';
+        // Remove any hidden foil/etched markers from the end or anywhere in the text
+        const nameText = rawText.replace(/\*[A-Z]\*/g, '').trim();
         
         // Parse name text to extract card details
         const nameMatch = nameText.match(/^(.+?)(?:\s+\(([^)]+)\))?(?:\s+([A-Z0-9\-★]+))?(?:\s+\*[A-Z]\*)?$/);
@@ -495,8 +497,9 @@ export class UIManager {
         const name = nameMatch[1].trim();
         const set = nameMatch[2] || '';
         const number = nameMatch[3] || '';
-        const isFoil = cardElement.dataset.foil === 'true' || nameText.includes('*F*');
-        const isEtched = cardElement.dataset.etched === 'true' || nameText.includes('*E*');
+        // Prefer dataset flags written at render time; fall back to hidden markers if dataset not present
+        const isFoil = (cardElement.dataset.foil === 'true') || /\*F\*/.test(rawText);
+        const isEtched = (cardElement.dataset.etched === 'true') || /\*E\*/.test(rawText);
         
         const cardData = {
             quantity,

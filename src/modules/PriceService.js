@@ -42,6 +42,39 @@ export class PriceService {
     }
 
     /**
+     * Determine the appropriate Scryfall price field(s) for a provider
+     * considering foil/etched flags. Returns a prioritized list.
+     */
+    getProviderPriceFields(providerKey, isFoil, isEtched) {
+        switch (providerKey) {
+        case 'tcgplayer':
+            if (isEtched) return ['usd_etched', 'usd_foil', 'usd'];
+            if (isFoil) return ['usd_foil', 'usd'];
+            return ['usd'];
+        case 'cardmarket':
+            if (isFoil) return ['eur_foil', 'eur'];
+            return ['eur'];
+        case 'cardhoarder':
+            if (isFoil) return ['tix_foil', 'tix'];
+            return ['tix'];
+        default:
+            return ['usd'];
+        }
+    }
+
+    /**
+     * Extract a price from a Scryfall prices object for a given provider,
+     * trying foil/etched variants and falling back to base when needed.
+     */
+    getPriceForProvider(prices, providerKey, isFoil, isEtched) {
+        const fields = this.getProviderPriceFields(providerKey, isFoil, isEtched);
+        for (const f of fields) {
+            if (prices && prices[f]) return { price: prices[f], field: f };
+        }
+        return { price: null, field: fields[fields.length - 1] };
+    }
+
+    /**
      * Fetch card price from Scryfall API
      * 
      * Note: Moxfield API does not provide pricing data. All pricing comes from Scryfall's API,
@@ -150,8 +183,7 @@ export class PriceService {
                 let final = null;
                 for (const key of order) {
                     const conf = this.providers[key];
-                    const field = conf.priceField;
-                    const p = bestMatch.prices && bestMatch.prices[field] ? bestMatch.prices[field] : null;
+                    const { price: p } = this.getPriceForProvider(bestMatch.prices, key, isFoil, isEtched);
                     if (p) {
                         final = {
                             price: p,
@@ -182,8 +214,7 @@ export class PriceService {
             } else {
                 // No fallback: only use selected provider
                 const providerConfig = this.providers[primary];
-                const field = providerConfig.priceField;
-                const p = bestMatch.prices && bestMatch.prices[field] ? bestMatch.prices[field] : null;
+                const { price: p } = this.getPriceForProvider(bestMatch.prices, primary, isFoil, isEtched);
                 const result = {
                     price: p,
                     cardName: bestMatch.name,
