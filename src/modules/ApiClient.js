@@ -6,6 +6,7 @@ export class ApiClient {
     constructor() {
         this.baseUrl = 'https://api2.moxfield.com';
         this.scryfallUrl = 'https://api.scryfall.com';
+        this.debug = false;
     }
 
     /**
@@ -15,9 +16,9 @@ export class ApiClient {
      */
     extractDeckId(url) {
         const patterns = [
-            /\/decks\/([a-zA-Z0-9_-]+)/,
-            /\/deck\/([a-zA-Z0-9_-]+)/,
-            /\/v2\/decks\/all\/([a-zA-Z0-9_-]+)/
+            /\/decks\/([a-zA-Z0-9_-]+)(?:\/|$)/,
+            /\/deck\/([a-zA-Z0-9_-]+)(?:\/|$)/,
+            /\/v2\/decks\/all\/([a-zA-Z0-9_-]+)(?:\/|$)/
         ];
 
         for (const pattern of patterns) {
@@ -37,8 +38,8 @@ export class ApiClient {
      */
     extractCollectionId(url) {
         const patterns = [
-            /\/collection\/([a-zA-Z0-9_-]+)/,
-            /\/v1\/collections\/search\/([a-zA-Z0-9_-]+)/
+            /\/collection\/([a-zA-Z0-9_-]+)(?:\/|$)/,
+            /\/v1\/collections\/search\/([a-zA-Z0-9_-]+)(?:\/|$)/
         ];
 
         for (const pattern of patterns) {
@@ -57,11 +58,16 @@ export class ApiClient {
      * @returns {Object|null} - Object with type and id, or null if invalid
      */
     extractBinderId(url) {
-        const pattern = /\/binders\/([a-zA-Z0-9_-]+)/;
-        const match = url.match(pattern);
+        const patterns = [
+            /\/binders\/([a-zA-Z0-9_-]+)(?:\/|$)/,
+            /\/v1\/trade-binders\/([a-zA-Z0-9_-]+)(?:\/|$)/
+        ];
         
-        if (match) {
-            return { type: 'binder', id: match[1] };
+        for (const pattern of patterns) {
+            const match = url.match(pattern);
+            if (match) {
+                return { type: 'binder', id: match[1] };
+            }
         }
 
         return null;
@@ -148,6 +154,27 @@ export class ApiClient {
         }
         
         return allCards.join('\n');
+    }
+
+    /**
+     * Fetch data from API URL and parse, with CORS-friendly fallback
+     * @param {string} apiUrl - The API URL to fetch
+     * @param {string} type - The type of data (wishlist/collection)
+     * @returns {Promise<string|Object>} - Parsed card list string, or an object with { apiUrl, cards: '' } when manual input is needed
+     */
+    async loadFromApiUrl(apiUrl, type) {
+        try {
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                // Defer to manual flow when response not OK (e.g., CORS)
+                return { apiUrl, cards: '' };
+            }
+            const data = await response.json();
+            return this.parseApiResponse(data, type);
+        } catch (_err) {
+            // Likely CORS/network error in browser; allow manual paste flow
+            return { apiUrl, cards: '' };
+        }
     }
 
     /**
@@ -293,152 +320,32 @@ export class ApiClient {
      */
     parseApiResponse(data, _type) {
         try {
-            // eslint-disable-next-line no-console
-            console.log('parseApiResponse called with data:', data);
-            // eslint-disable-next-line no-console
-            console.log('Data type:', typeof data);
-            // eslint-disable-next-line no-console
-            console.log('Data keys:', Object.keys(data || {}));
+            if (this.debug) {
+                // eslint-disable-next-line no-console
+                console.log('parseApiResponse called with data:', data);
+                // eslint-disable-next-line no-console
+                console.log('Data type:', typeof data);
+                // eslint-disable-next-line no-console
+                console.log('Data keys:', Object.keys(data || {}));
+            }
             
             let deckList = '';
             
             // Handle different API response formats
             if (data.mainboard) {
-                // eslint-disable-next-line no-console
-                console.log('Processing mainboard data:', data.mainboard);
-                // Mainboard cards from main deck API
-                const mainboardCards = [];
-                
-                // Check if mainboard is an object (not array) and convert to array
                 const mainboardArray = Array.isArray(data.mainboard) ? data.mainboard : Object.values(data.mainboard);
-                // eslint-disable-next-line no-console
-                console.log('Mainboard array:', mainboardArray);
-                
-                mainboardArray.forEach((cardData) => {
-                    const quantity = cardData.quantity || 1;
-                    const {name} = cardData.card;
-                    const set = (cardData.card.set || '').toUpperCase();
-                    const number = cardData.card.cn || cardData.card.number || cardData.card.collector_number || '';
-                    
-                    // Enhanced foil detection - check multiple possible fields
-                    const isFoil = cardData.card.isFoil || 
-                                 cardData.card.finish === 'foil' || 
-                                 cardData.card.finish === 'foil-etched' ||
-                                 cardData.isFoil ||
-                                 false;
-                    
-                    // Enhanced etched detection - check both finish field and etched boolean
-                    const isEtched = cardData.card.finish === 'etched' || 
-                                   cardData.card.finish === 'foil-etched' ||
-                                   cardData.card.etched === true ||
-                                   cardData.isEtched ||
-                                   false;
-                    
-                    let cardLine = `${quantity} ${name} (${set})`;
-                    if (number) {
-                        cardLine += ` ${number}`;
-                    }
-                    if (isEtched) {
-                        cardLine += ' *E*';
-                    } else if (isFoil) {
-                        cardLine += ' *F*';
-                    }
-                    mainboardCards.push(cardLine);
-                });
-                
-                // Sort mainboard cards alphabetically
-                mainboardCards.sort();
-                deckList += `${mainboardCards.join('\n')}\n`;
+                const lines = mainboardArray.map(c => this.buildCardLine(this.normalizeCard(c)) ).sort();
+                deckList += `${lines.join('\n')}\n`;
             } else if (data.cards && Array.isArray(data.cards)) {
-                // eslint-disable-next-line no-console
-                console.log('Processing cards array:', data.cards);
-                // Binder API format - cards array contains card objects
-                const cards = [];
-                
-                data.cards.forEach(card => {
-                    const quantity = card.quantity || 1;
-                    const name = card.card?.name || card.name;
-                    const set = (card.card?.set || card.set || '').toUpperCase();
-                    const number = card.card?.cn || card.card?.number || card.card?.collector_number || card.number || '';
-                    
-                    // Enhanced foil detection for binder format
-                    const isFoil = card.card?.isFoil || 
-                                 card.card?.finish === 'foil' || 
-                                 card.card?.finish === 'foil-etched' ||
-                                 card.isFoil ||
-                                 false;
-                    
-                    // Enhanced etched detection for binder format
-                    const isEtched = card.card?.finish === 'etched' || 
-                                   card.card?.finish === 'foil-etched' ||
-                                   card.card?.etched === true ||
-                                   card.isEtched ||
-                                   false;
-                    
-                    let cardLine = `${quantity} ${name} (${set})`;
-                    if (number) {
-                        cardLine += ` ${number}`;
-                    }
-                    if (isEtched) {
-                        cardLine += ' *E*';
-                    } else if (isFoil) {
-                        cardLine += ' *F*';
-                    }
-                    cards.push(cardLine);
-                });
-                
-                // Sort cards alphabetically
-                cards.sort();
-                deckList += `${cards.join('\n')}\n`;
+                const lines = data.cards.map(c => this.buildCardLine(this.normalizeCard(c)) ).sort();
+                deckList += `${lines.join('\n')}\n`;
             } else if (data.data && Array.isArray(data.data)) {
-                // eslint-disable-next-line no-console
-                console.log('Processing data array:', data.data);
-                // Collection API format - data array contains card objects
-                const cards = [];
-                
-                data.data.forEach(card => {
-                    const quantity = card.quantity || 1;
-                    const name = card.card?.name || card.name;
-                    const set = (card.card?.set || card.set || '').toUpperCase();
-                    const number = card.card?.cn || card.card?.number || card.card?.collector_number || card.number || '';
-                    
-                    // Enhanced foil detection for collection format
-                    const isFoil = card.card?.isFoil || 
-                                 card.card?.finish === 'foil' || 
-                                 card.card?.finish === 'foil-etched' ||
-                                 card.isFoil ||
-                                 false;
-                    
-                    // Enhanced etched detection for collection format
-                    const isEtched = card.card?.finish === 'etched' || 
-                                   card.card?.finish === 'foil-etched' ||
-                                   card.card?.etched === true ||
-                                   card.isEtched ||
-                                   false;
-                    
-                    let cardLine = `${quantity} ${name} (${set})`;
-                    if (number) {
-                        cardLine += ` ${number}`;
-                    }
-                    if (isEtched) {
-                        cardLine += ' *E*';
-                    } else if (isFoil) {
-                        cardLine += ' *F*';
-                    }
-                    cards.push(cardLine);
-                });
-                
-                // Sort cards alphabetically
-                cards.sort();
-                deckList += `${cards.join('\n')}\n`;
+                const lines = data.data.map(c => this.buildCardLine(this.normalizeCard(c)) ).sort();
+                deckList += `${lines.join('\n')}\n`;
             } else if (typeof data === 'string') {
-                // eslint-disable-next-line no-console
-                console.log('Processing string data');
                 // Direct text format
                 deckList = data;
             } else {
-                // eslint-disable-next-line no-console
-                console.log('Trying findCardsInResponse fallback');
                 // Try to find cards in the response structure
                 const cards = this.findCardsInResponse(data);
                 cards.forEach(card => {
@@ -446,8 +353,10 @@ export class ApiClient {
                 });
             }
             
-            // eslint-disable-next-line no-console
-            console.log('Final deckList:', deckList);
+            if (this.debug) {
+                // eslint-disable-next-line no-console
+                console.log('Final deckList:', deckList);
+            }
             return deckList.trim();
             
         } catch (error) {
@@ -527,4 +436,33 @@ export class ApiClient {
                card.isEtched ||
                false;
     }
-} 
+
+    /**
+     * Normalize card-like objects from different API shapes to a common shape
+     * @param {Object} raw - Raw card entry possibly with nested `card`
+     * @returns {{quantity:number,name:string,set:string,number:string,isFoil:boolean,isEtched:boolean}}
+     */
+    normalizeCard(raw) {
+        const base = raw.card || raw;
+        const quantity = raw.quantity || 1;
+        const name = base?.name || raw.name || '';
+        const set = (base?.set || raw.set || '').toUpperCase();
+        const number = base?.cn || base?.number || base?.collector_number || raw.number || '';
+        const isFoil = this.isFoil(raw);
+        const isEtched = this.isEtched(raw);
+        return { quantity, name, set, number, isFoil, isEtched };
+    }
+
+    /**
+     * Build a consistent card line string from normalized fields
+     * @param {Object} c - Normalized card fields
+     * @returns {string}
+     */
+    buildCardLine(c) {
+        let line = `${c.quantity} ${c.name} (${c.set})`;
+        if (c.number) line += ` ${c.number}`;
+        if (c.isEtched) line += ' *E*';
+        else if (c.isFoil) line += ' *F*';
+        return line;
+    }
+}

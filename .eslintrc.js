@@ -61,7 +61,6 @@ module.exports = {
         'no-unexpected-multiline': 'error',
         'no-unused-labels': 'error',
         'no-useless-catch': 'error',
-        'no-useless-escape': 'error',
         'require-await': 'error',
         'use-isnan': 'error',
         'valid-jsdoc': 'off',

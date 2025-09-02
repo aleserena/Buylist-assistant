@@ -35,6 +35,17 @@ export class UIManager {
         this.missingCountEl = document.getElementById('missingCount');
         this.matchesListEl = document.getElementById('matchesList');
         this.missingListEl = document.getElementById('missingList');
+
+        // Controls
+        this.matchesSort = document.getElementById('matchesSort');
+        this.missingSort = document.getElementById('missingSort');
+        this.matchesFilterFoil = document.getElementById('matchesFilterFoil');
+        this.matchesFilterEtched = document.getElementById('matchesFilterEtched');
+        this.missingFilterFoil = document.getElementById('missingFilterFoil');
+        this.missingFilterEtched = document.getElementById('missingFilterEtched');
+        this.matchesResetBtn = document.getElementById('matchesReset');
+        this.missingResetBtn = document.getElementById('missingReset');
+        this.exportMissingBtn = document.getElementById('exportMissing');
         
         // Tab buttons - scoped to results section
         this.tabButtons = this.resultsSection.querySelectorAll('.tab-btn');
@@ -87,6 +98,19 @@ export class UIManager {
             // Trigger price refresh event
             this.triggerEvent('priceProviderChanged');
         });
+
+        // Sorting and filters
+        const applyMatches = () => this.applyControls(this.matchesListEl, this.matchesSort.value, this.matchesFilterFoil.checked, this.matchesFilterEtched.checked);
+        const applyMissing = () => this.applyControls(this.missingListEl, this.missingSort.value, this.missingFilterFoil.checked, this.missingFilterEtched.checked);
+        if (this.matchesSort) this.matchesSort.addEventListener('change', applyMatches);
+        if (this.missingSort) this.missingSort.addEventListener('change', applyMissing);
+        if (this.matchesFilterFoil) this.matchesFilterFoil.addEventListener('change', applyMatches);
+        if (this.matchesFilterEtched) this.matchesFilterEtched.addEventListener('change', applyMatches);
+        if (this.missingFilterFoil) this.missingFilterFoil.addEventListener('change', applyMissing);
+        if (this.missingFilterEtched) this.missingFilterEtched.addEventListener('change', applyMissing);
+        if (this.matchesResetBtn) this.matchesResetBtn.addEventListener('click', () => this.resetControls('matches'));
+        if (this.missingResetBtn) this.missingResetBtn.addEventListener('click', () => this.resetControls('missing'));
+        if (this.exportMissingBtn) this.exportMissingBtn.addEventListener('click', () => this.exportMissingCsv());
     }
 
     /**
@@ -179,9 +203,91 @@ export class UIManager {
         // Display card lists
         this.displayCardList(this.matchesListEl, matches, 'match');
         this.displayCardList(this.missingListEl, missing, 'missing');
+
+        // Apply current controls to both lists
+        if (this.matchesSort) this.applyControls(this.matchesListEl, this.matchesSort.value, this.matchesFilterFoil.checked, this.matchesFilterEtched.checked);
+        if (this.missingSort) this.applyControls(this.missingListEl, this.missingSort.value, this.missingFilterFoil.checked, this.missingFilterEtched.checked);
         
         // Switch to matches tab by default
         this.switchTab('matches');
+    }
+
+    /**
+     * Apply sort and filter controls to a list container
+     */
+    applyControls(container, sortBy, showFoil, showEtched) {
+        if (!container) return;
+        // Filter
+        const items = Array.from(container.querySelectorAll('.card-item'));
+        items.forEach(el => {
+            const isFoil = el.dataset.foil === 'true';
+            const isEtched = el.dataset.etched === 'true';
+            const foilOk = showFoil ? isFoil : true;
+            const etchedOk = showEtched ? isEtched : true;
+            el.style.display = (foilOk && etchedOk) ? '' : 'none';
+        });
+
+        // Sort
+        const visible = items.filter(el => el.style.display !== 'none');
+        const getName = el => (el.querySelector('.card-name')?.textContent || '').trim();
+        const getSet = el => {
+            const m = getName(el).match(/\(([^)]+)\)/);
+            return (m && m[1]) ? m[1] : '';
+        };
+        const getQty = el => parseInt((el.querySelector('.card-quantity')?.textContent || '0').replace('x','')) || 0;
+        const getPrice = el => {
+            const v = parseFloat(el.dataset.priceTotal || 'NaN');
+            return isNaN(v) ? -1 : v;
+        };
+        let comparator = (a,b) => getName(a).localeCompare(getName(b));
+        if (sortBy === 'set') comparator = (a,b) => getSet(a).localeCompare(getSet(b)) || getName(a).localeCompare(getName(b));
+        if (sortBy === 'quantity') comparator = (a,b) => getQty(b) - getQty(a) || getName(a).localeCompare(getName(b));
+        if (sortBy === 'price') comparator = (a,b) => getPrice(b) - getPrice(a) || getName(a).localeCompare(getName(b));
+        visible.sort(comparator);
+        visible.forEach(el => container.appendChild(el));
+    }
+
+    resetControls(which) {
+        if (which === 'matches') {
+            if (this.matchesSort) this.matchesSort.value = 'name';
+            if (this.matchesFilterFoil) this.matchesFilterFoil.checked = false;
+            if (this.matchesFilterEtched) this.matchesFilterEtched.checked = false;
+            this.applyControls(this.matchesListEl, 'name', false, false);
+        } else {
+            if (this.missingSort) this.missingSort.value = 'name';
+            if (this.missingFilterFoil) this.missingFilterFoil.checked = false;
+            if (this.missingFilterEtched) this.missingFilterEtched.checked = false;
+            this.applyControls(this.missingListEl, 'name', false, false);
+        }
+    }
+
+    exportMissingCsv() {
+        const rows = [['quantity','name','set','number','foil','etched']];
+        const items = Array.from(this.missingListEl.querySelectorAll('.card-item'));
+        items.forEach(el => {
+            const qty = parseInt((el.querySelector('.card-quantity')?.textContent || '0').replace('x','')) || 0;
+            const nameText = el.querySelector('.card-name')?.textContent || '';
+            const m = nameText.match(/^(.+?)(?:\s+\(([^)]+)\))?(?:\s+([A-Z0-9\-?]+))?/);
+            const name = m && m[1] ? m[1].trim() : nameText.trim();
+            const set = m && m[2] ? m[2].trim() : '';
+            const number = m && m[3] ? m[3].trim() : '';
+            const foil = el.dataset.foil === 'true';
+            const etched = el.dataset.etched === 'true';
+            rows.push([qty,name,set,number,foil,etched]);
+        });
+        const csv = rows.map(r => r.map(v => {
+            const s = String(v);
+            return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+        }).join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'missing.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     }
 
     /**
@@ -210,41 +316,77 @@ export class UIManager {
                 cardElement.dataset.collectionData = JSON.stringify(card.collection);
             }
             
-            const foilIndicator = displayCard.foil ? ' *F*' : '';
-            const etchedIndicator = displayCard.etched ? ' *E*' : '';
+            // Store flags on the element for reliable parsing later
+            if (displayCard.foil) cardElement.dataset.foil = 'true';
+            if (displayCard.etched) cardElement.dataset.etched = 'true';
+            
             const setInfo = displayCard.set ? ` (${displayCard.set})` : '';
             const numberInfo = displayCard.number ? ` ${displayCard.number}` : '';
             
+            const badges = `
+                <span class="card-badges">
+                    ${displayCard.foil ? `
+                        <span class="badge badge-foil" title="Foil" aria-label="Foil">
+                            <svg class="icon icon-foil" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false" fill="currentColor">
+                                <path d="M12 17.27L18.18 21 16.54 13.97 22 9.24 14.81 8.63 12 2 9.19 8.63 2 9.24 7.46 13.97 5.82 21z"></path>
+                            </svg>
+                        </span>` : ''}
+                    ${displayCard.etched ? `
+                        <span class="badge badge-etched" title="Etched" aria-label="Etched">
+                            <svg class="icon icon-etched" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false" fill="currentColor">
+                                <path d="M12 2L22 12 12 22 2 12z"></path>
+                            </svg>
+                        </span>` : ''}
+                </span>
+            `;
+            
+            const quantityForDisplay = (type === 'match' && typeof card.quantity === 'number') ? card.quantity : displayCard.quantity;
+            // Hidden text flags for compatibility and accessibility
+            const hiddenFoil = displayCard.foil ? '<span class="visually-hidden">*F*</span>' : '';
+            const hiddenEtched = displayCard.etched ? '<span class="visually-hidden">*E*</span>' : '';
             let cardHtml = `
-                <span class="card-quantity">${displayCard.quantity}x</span>
-                <span class="card-name">${displayCard.name}${setInfo}${numberInfo}${foilIndicator}${etchedIndicator}</span>
+                <span class="card-quantity">${quantityForDisplay}x</span>
+                <span class="card-name">${displayCard.name}${setInfo}${numberInfo}${hiddenFoil}${hiddenEtched}</span>
+                ${badges}
                 <span class="card-price">Loading...</span>
             `;
             
             // Add partial matches if they exist
             if (type === 'missing' && card.partialMatches && card.partialMatches.length > 0) {
-                // eslint-disable-next-line no-console
-                console.log('Found partial matches for card:', displayCard.name, card.partialMatches);
                 cardHtml += '<div class="partial-matches">';
                 cardHtml += '<div class="partial-matches-header">Partial matches found:</div>';
                 card.partialMatches.forEach(partialMatch => {
-                    const partialFoilIndicator = partialMatch.foil ? ' *F*' : '';
-                    const partialEtchedIndicator = partialMatch.etched ? ' *E*' : '';
                     const partialSetInfo = partialMatch.set ? ` (${partialMatch.set})` : '';
                     const partialNumberInfo = partialMatch.number ? ` ${partialMatch.number}` : '';
+                    const hiddenPF = partialMatch.foil ? '<span class="visually-hidden">*F*</span>' : '';
+                    const hiddenPE = partialMatch.etched ? '<span class="visually-hidden">*E*</span>' : '';
+                    const partialBadges = `
+                        <span class="card-badges">
+                            ${partialMatch.foil ? `
+                                <span class="badge badge-foil" title="Foil" aria-label="Foil">
+                                    <svg class="icon icon-foil" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false" fill="currentColor">
+                                        <path d="M12 17.27L18.18 21 16.54 13.97 22 9.24 14.81 8.63 12 2 9.19 8.63 2 9.24 7.46 13.97 5.82 21z"></path>
+                                    </svg>
+                                </span>` : ''}
+                            ${partialMatch.etched ? `
+                                <span class="badge badge-etched" title="Etched" aria-label="Etched">
+                                    <svg class="icon icon-etched" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false" fill="currentColor">
+                                        <path d="M12 2L22 12 12 22 2 12z"></path>
+                                    </svg>
+                                </span>` : ''}
+                        </span>
+                    `;
                     
                     cardHtml += `
                         <div class="partial-match">
                             <span class="partial-match-quantity">${partialMatch.quantity}x</span>
-                            <span class="partial-match-name">${partialMatch.name}${partialSetInfo}${partialNumberInfo}${partialFoilIndicator}${partialEtchedIndicator}</span>
+                            <span class="partial-match-name">${partialMatch.name}${partialSetInfo}${partialNumberInfo}${hiddenPF}${hiddenPE}</span>
+                            ${partialBadges}
                             <span class="partial-match-reason">${partialMatch.matchReason}</span>
                         </div>
                     `;
                 });
                 cardHtml += '</div>';
-            } else if (type === 'missing') {
-                // eslint-disable-next-line no-console
-                console.log('No partial matches for card:', displayCard.name, 'partialMatches:', card.partialMatches);
             }
             
             cardElement.innerHTML = cardHtml;
@@ -353,8 +495,8 @@ export class UIManager {
         const name = nameMatch[1].trim();
         const set = nameMatch[2] || '';
         const number = nameMatch[3] || '';
-        const isFoil = nameText.includes('*F*');
-        const isEtched = nameText.includes('*E*');
+        const isFoil = cardElement.dataset.foil === 'true' || nameText.includes('*F*');
+        const isEtched = cardElement.dataset.etched === 'true' || nameText.includes('*E*');
         
         const cardData = {
             quantity,
@@ -597,6 +739,90 @@ export class UIManager {
         // Remove loading class
         if (loadBtn) {
             loadBtn.classList.remove('loading');
+        }
+    }
+
+    /**
+     * Show price loading state
+     */
+    showPriceLoadingState() {
+        // Add a loading indicator to the results section
+        const resultsSection = document.querySelector('.results-section');
+        if (resultsSection) {
+            let loadingIndicator = document.getElementById('priceLoadingIndicator');
+            if (!loadingIndicator) {
+                loadingIndicator = document.createElement('div');
+                loadingIndicator.id = 'priceLoadingIndicator';
+                loadingIndicator.className = 'price-loading-indicator';
+                loadingIndicator.innerHTML = `
+                    <div class="loading-spinner"></div>
+                    <span>Refreshing prices...</span>
+                `;
+                resultsSection.appendChild(loadingIndicator);
+            }
+            loadingIndicator.style.display = 'flex';
+        }
+    }
+
+    /**
+     * Hide price loading state
+     */
+    hidePriceLoadingState() {
+        const loadingIndicator = document.getElementById('priceLoadingIndicator');
+        if (loadingIndicator) {
+            loadingIndicator.style.display = 'none';
+        }
+    }
+
+    /**
+     * Update total price display
+     * @param {number} totalPrice - The total price of all matches
+     * @param {number} pricedCount - The number of cards with prices
+     */
+    updateTotalPrice(totalMatches, pricedMatches, totalMissing = 0, pricedMissing = 0) {
+        // Find or create total price element
+        let totalPriceElement = document.getElementById('totalPrice');
+        if (!totalPriceElement) {
+            // Create the element if it doesn't exist
+            const resultsSection = document.querySelector('.results-section');
+            if (resultsSection) {
+                totalPriceElement = document.createElement('div');
+                totalPriceElement.id = 'totalPrice';
+                totalPriceElement.className = 'total-price';
+                resultsSection.appendChild(totalPriceElement);
+            }
+        }
+        
+        if (totalPriceElement) {
+            if ((totalMatches > 0) || (totalMissing > 0)) {
+                const matchCount = parseInt(this.matchesFoundEl.textContent) || 0;
+                
+                // Get the current price provider to determine currency
+                const priceProvider = this.priceProviderSelect?.value || 'tcgplayer';
+                const providerConfig = window.mtgCardComparator?.priceService?.providers?.[priceProvider] || { priceField: 'usd' };
+                const currencySymbol = (providerConfig.priceField === 'eur') ? '\u20AC' : (providerConfig.priceField === 'tix' ? 'Tix' : '$');
+                const parts = [];
+                if (totalMatches > 0) {
+                    parts.push(`
+                        <div>
+                            <span class="total-price-label">Matches Total:</span>
+                            <span class="total-price-value">${currencySymbol}${totalMatches.toFixed(2)}</span>
+                            <span class="total-price-note">(${pricedMatches} of ${matchCount} cards priced)</span>
+                        </div>`);
+                }
+                if (totalMissing > 0) {
+                    parts.push(`
+                        <div>
+                            <span class="total-price-label">Missing Total:</span>
+                            <span class="total-price-value">${currencySymbol}${totalMissing.toFixed(2)}</span>
+                            <span class="total-price-note">(${pricedMissing} lines priced)</span>
+                        </div>`);
+                }
+                totalPriceElement.innerHTML = `<div class="total-price-info">${parts.join('')}</div>`;
+                totalPriceElement.style.display = 'block';
+            } else {
+                totalPriceElement.style.display = 'none';
+            }
         }
     }
 } 

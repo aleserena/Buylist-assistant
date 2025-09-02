@@ -6,6 +6,26 @@ export class PriceService {
     constructor() {
         this.priceCache = new Map();
         this.scryfallUrl = 'https://api.scryfall.com';
+        this.fallbackEnabled = false;
+        
+        // Define different price sources and their Scryfall price fields
+        this.providers = {
+            tcgplayer: {
+                name: 'TCGPlayer',
+                priceField: 'usd',
+                currency: 'USD'
+            },
+            cardmarket: {
+                name: 'Cardmarket',
+                priceField: 'eur',
+                currency: 'EUR'
+            },
+            cardhoarder: {
+                name: 'Cardhoarder',
+                priceField: 'tix',
+                currency: 'MTGO Tix'
+            }
+        };
     }
 
     /**
@@ -23,15 +43,28 @@ export class PriceService {
 
     /**
      * Fetch card price from Scryfall API
+     * 
+     * Note: Moxfield API does not provide pricing data. All pricing comes from Scryfall's API,
+     * which aggregates prices from three main sources:
+     * - TCGPlayer: usd (USD prices from TCGPlayer marketplace)
+     * - Cardmarket: eur (Euro prices from Cardmarket)
+     * - Cardhoarder: tix (MTGO ticket prices from Cardhoarder)
+     * 
+     * Each provider uses only its specific price field. If the price is not available, null is returned.
+     * 
      * @param {string} cardName - The card name
      * @param {string} setCode - The set code
      * @param {boolean} isFoil - Whether the card is foil
      * @param {boolean} isEtched - Whether the card is etched
+     * @param {string} provider - The price source (tcgplayer, cardmarket, cardhoarder)
      * @returns {Promise<Object>} - Price data object
      */
-    async fetchCardPrice(cardName, setCode = '', isFoil = false, isEtched = false) {
-        const provider = 'cardkingdom'; // Default provider
-        const cacheKey = this.getPriceCacheKey(cardName, setCode, isFoil, isEtched, provider);
+    async fetchCardPrice(cardName, setCode = '', isFoil = false, isEtched = false, provider = 'tcgplayer', options = undefined) {
+        const fallbackEnabled = options && Object.prototype.hasOwnProperty.call(options, 'fallback')
+            ? !!options.fallback
+            : !!this.fallbackEnabled;
+        const providerKey = provider + (fallbackEnabled ? ':fb' : '');
+        const cacheKey = this.getPriceCacheKey(cardName, setCode, isFoil, isEtched, providerKey);
         
         // Check cache first
         if (this.priceCache.has(cacheKey)) {
@@ -48,88 +81,150 @@ export class PriceService {
             const response = await fetch(`${this.scryfallUrl}/cards/search?q=${encodeURIComponent(searchQuery)}`);
             
             if (!response.ok) {
+                const providerConfig = this.providers[provider] || this.providers.tcgplayer;
                 if (response.status === 429) {
                     return {
                         price: null,
                         error: 'Rate limit exceeded. Please try again later.',
                         cardName,
-                        provider
+                        provider: providerConfig.name
                     };
                 }
                 return {
                     price: null,
                     error: `HTTP ${response.status}`,
                     cardName,
-                    provider
+                    provider: providerConfig.name
                 };
             }
 
             const data = await response.json();
             
             if (!data.data || data.data.length === 0) {
+                const providerConfig = this.providers[provider] || this.providers.tcgplayer;
                 return {
                     price: null,
                     error: 'Card not found',
                     cardName,
-                    provider
+                    provider: providerConfig.name
                 };
             }
 
-            // Find the best matching card
-            let bestMatch = data.data[0];
+            // Find the best match (exact name match first, then partial)
+            let bestMatch = null;
             
-            // If we have a set code, try to find an exact match
-            if (setCode) {
-                const exactMatch = data.data.find(card => 
-                    card.set?.toLowerCase() === setCode.toLowerCase()
-                );
-                if (exactMatch) {
-                    bestMatch = exactMatch;
+            // First try exact name match
+            for (const card of data.data) {
+                if (card.name.toLowerCase() === cardName.toLowerCase()) {
+                    bestMatch = card;
+                    break;
                 }
             }
-
-            // Get price based on foil status
-            let price = null;
-            if (isFoil && bestMatch.prices?.usd_foil) {
-                price = bestMatch.prices.usd_foil;
-            } else if (isEtched && bestMatch.prices?.usd_etched) {
-                price = bestMatch.prices.usd_etched;
-            } else if (bestMatch.prices?.usd) {
-                price = bestMatch.prices.usd;
+            
+            // If no exact match, try partial match
+            if (!bestMatch) {
+                for (const card of data.data) {
+                    if (card.name.toLowerCase().includes(cardName.toLowerCase()) ||
+                        cardName.toLowerCase().includes(card.name.toLowerCase())) {
+                        bestMatch = card;
+                        break;
+                    }
+                }
+            }
+            
+            if (!bestMatch) {
+                const providerConfig = this.providers[provider] || this.providers.tcgplayer;
+                return {
+                    price: null,
+                    error: 'No matching card found',
+                    cardName,
+                    provider: providerConfig.name
+                };
             }
 
-            const result = {
-                price,
-                error: null,
-                cardName,
-                provider
-            };
-
-            // Cache the result
-            this.priceCache.set(cacheKey, result);
+            const primary = (this.providers[provider] ? provider : 'tcgplayer');
+            if (fallbackEnabled) {
+                // Try primary, then fallbacks
+                const tryOrder = ['tcgplayer', 'cardmarket', 'cardhoarder'];
+                const order = [primary, ...tryOrder.filter(p => p !== primary)];
+                let final = null;
+                for (const key of order) {
+                    const conf = this.providers[key];
+                    const field = conf.priceField;
+                    const p = bestMatch.prices && bestMatch.prices[field] ? bestMatch.prices[field] : null;
+                    if (p) {
+                        final = {
+                            price: p,
+                            cardName: bestMatch.name,
+                            setCode: bestMatch.set,
+                            provider: conf.name,
+                            currency: conf.currency,
+                            isFallback: key !== primary,
+                            fallbackReason: key !== primary ? `Missing price for selected provider; used ${conf.name}` : ''
+                        };
+                        break;
+                    }
+                }
+                if (!final) {
+                    const providerConfig = this.providers[primary];
+                    final = {
+                        price: null,
+                        error: 'Price not available from any provider',
+                        cardName: bestMatch.name,
+                        provider: providerConfig.name,
+                        currency: providerConfig.currency,
+                        isFallback: false,
+                        fallbackReason: ''
+                    };
+                }
+                this.priceCache.set(cacheKey, final);
+                return final;
+            } else {
+                // No fallback: only use selected provider
+                const providerConfig = this.providers[primary];
+                const field = providerConfig.priceField;
+                const p = bestMatch.prices && bestMatch.prices[field] ? bestMatch.prices[field] : null;
+                const result = {
+                    price: p,
+                    cardName: bestMatch.name,
+                    setCode: bestMatch.set,
+                    provider: providerConfig.name,
+                    currency: providerConfig.currency,
+                    isFallback: false,
+                    fallbackReason: ''
+                };
+                this.priceCache.set(cacheKey, result);
+                return result;
+            }
             
-            return result;
-
         } catch (error) {
+            const providerConfig = this.providers[provider] || this.providers.tcgplayer;
             return {
                 price: null,
                 error: error.message,
                 cardName,
-                provider
+                provider: providerConfig.name
             };
         }
     }
 
     /**
      * Update card price in the UI
-     * @param {HTMLElement} cardElement - The card element
-     * @param {Object} card - The card data
-     * @param {string} _type - The type of card (unused)
+     * @param {Element} cardElement - The card element
+     * @param {Object} priceData - The price data
+     * @param {string} _type - The type (unused parameter)
      */
-    updateCardPrice(cardElement, { price }, _type) {
+    updateCardPrice(cardElement, { price } = {}, _type) {
+        if (!cardElement) return;
+        
         const priceElement = cardElement.querySelector('.card-price');
         if (!priceElement) return;
         
+        // If price is undefined (e.g., placeholder event), keep current text/state
+        if (price === undefined) {
+            return;
+        }
+
         if (price) {
             priceElement.textContent = `$${price}`;
             priceElement.classList.add('has-price');

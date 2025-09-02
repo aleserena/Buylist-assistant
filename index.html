@@ -68,14 +68,11 @@
                 </label>
             </div>
             <div class="option-group">
-                <label for="priceProvider" class="price-provider-label">Price Provider:</label>
+                <label for="priceProvider" class="price-provider-label">Price Source:</label>
                 <select id="priceProvider" class="price-provider-select">
-                    <option value="cardkingdom">Card Kingdom</option>
-                    <option value="tcgplayer">TCGPlayer</option>
-                    <option value="starcitygames">Star City Games</option>
-                    <option value="coolstuffinc">CoolStuffInc</option>
-                    <option value="cardhoarder">CardHoarder</option>
-                    <option value="cardmarket">CardMarket</option>
+                    <option value="tcgplayer">TCGPlayer (USD)</option>
+                    <option value="cardmarket">Cardmarket (EUR)</option>
+                    <option value="cardhoarder">Cardhoarder (MTGO Tix)</option>
                 </select>
             </div>
         </div>
@@ -84,6 +81,13 @@
 
         <div class="results-section" id="resultsSection" style="display: none;">
             <h2>Results</h2>
+            <div class="results-legend">
+                <span class="legend-label">Legend:</span>
+                <span class="badge badge-foil" title="Foil" aria-label="Foil"><svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14"><path d="M12 17.27L18.18 21 16.54 13.97 22 9.24 14.81 8.63 12 2 9.19 8.63 2 9.24 7.46 13.97 5.82 21z" fill="currentColor"/></svg></span>
+                <span class="legend-text">Foil</span>
+                <span class="badge badge-etched" title="Etched" aria-label="Etched"><svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14"><path d="M12 2L22 12 12 22 2 12z" fill="currentColor"/></svg></span>
+                <span class="legend-text">Etched</span>
+            </div>
             <div class="results-stats">
                 <div class="stat">
                     <span class="stat-label">Total Wishlist:</span>
@@ -109,10 +113,37 @@
             </div>
 
             <div class="tab-content active" id="matchesTab">
+                <div class="list-controls">
+                    <label>Sort:
+                        <select id="matchesSort">
+                            <option value="name">Name</option>
+                            <option value="set">Set</option>
+                            <option value="quantity">Quantity</option>
+                            <option value="price">Price</option>
+                        </select>
+                    </label>
+                    <label class="chk"><input type="checkbox" id="matchesFilterFoil"> Foil</label>
+                    <label class="chk"><input type="checkbox" id="matchesFilterEtched"> Etched</label>
+                    <button id="matchesReset" class="small-btn" type="button">Reset</button>
+                </div>
                 <div class="card-list" id="matchesList"></div>
             </div>
 
             <div class="tab-content" id="missingTab">
+                <div class="list-controls">
+                    <label>Sort:
+                        <select id="missingSort">
+                            <option value="name">Name</option>
+                            <option value="set">Set</option>
+                            <option value="quantity">Quantity</option>
+                            <option value="price">Price</option>
+                        </select>
+                    </label>
+                    <label class="chk"><input type="checkbox" id="missingFilterFoil"> Foil</label>
+                    <label class="chk"><input type="checkbox" id="missingFilterEtched"> Etched</label>
+                    <button id="exportMissing" class="small-btn" type="button">Export CSV</button>
+                    <button id="missingReset" class="small-btn" type="button">Reset</button>
+                </div>
                 <div class="card-list" id="missingList"></div>
             </div>
         </div>

@@ -21,8 +21,6 @@ global.confirm = jest.fn();
 // Create a mock MTGCardComparator class that works with the new modular structure
 class MockMTGCardComparator {
     constructor() {
-        console.log('Creating MockMTGCardComparator instance');
-        
         // Mock the methods that tests expect with realistic implementations
         this.parseCardLine = jest.fn((line) => {
             // Simple mock implementation that returns a basic card object
@@ -162,9 +160,9 @@ class MockMTGCardComparator {
             // Handle various deck URL formats - be more specific about the path
             // eslint-disable-next-line no-useless-escape
             const patterns = [
-                /^https?:\/\/[^\/]+\/decks\/([a-zA-Z0-9_-]+)(?:\/|$)/,
-                /^https?:\/\/[^\/]+\/deck\/([a-zA-Z0-9_-]+)(?:\/|$)/,
-                /^https?:\/\/[^\/]+\/v2\/decks\/all\/([a-zA-Z0-9_-]+)(?:\/|$)/
+                /^https?:\/\/[^/]+\/decks\/([a-zA-Z0-9_-]+)(?:\/|$)/,
+                /^https?:\/\/[^/]+\/deck\/([a-zA-Z0-9_-]+)(?:\/|$)/,
+                /^https?:\/\/[^/]+\/v2\/decks\/all\/([a-zA-Z0-9_-]+)(?:\/|$)/
             ];
             
             for (const pattern of patterns) {
@@ -188,10 +186,10 @@ class MockMTGCardComparator {
             // Handle various collection URL formats - be more specific about the path
             // eslint-disable-next-line no-useless-escape
             const patterns = [
-                /^https?:\/\/[^\/]+\/collections\/([a-zA-Z0-9_-]+)(?:\/|$)/,
-                /^https?:\/\/[^\/]+\/collection\/([a-zA-Z0-9_-]+)(?:\/|$)/,
-                /^https?:\/\/[^\/]+\/v2\/collections\/all\/([a-zA-Z0-9_-]+)(?:\/|$)/,
-                /^https?:\/\/[^\/]+\/v1\/collections\/search\/([a-zA-Z0-9_-]+)(?:\/|$)/
+                /^https?:\/\/[^/]+\/collections\/([a-zA-Z0-9_-]+)(?:\/|$)/,
+                /^https?:\/\/[^/]+\/collection\/([a-zA-Z0-9_-]+)(?:\/|$)/,
+                /^https?:\/\/[^/]+\/v2\/collections\/all\/([a-zA-Z0-9_-]+)(?:\/|$)/,
+                /^https?:\/\/[^/]+\/v1\/collections\/search\/([a-zA-Z0-9_-]+)(?:\/|$)/
             ];
             
             for (const pattern of patterns) {
@@ -213,9 +211,9 @@ class MockMTGCardComparator {
             // Handle both regular URLs and API URLs - be more specific about the path
             // eslint-disable-next-line no-useless-escape
             const patterns = [
-                /^https?:\/\/[^\/]+\/binders\/([a-zA-Z0-9_-]+)(?:\/|$)/,
-                /^https?:\/\/[^\/]+\/binder\/([a-zA-Z0-9_-]+)(?:\/|$)/,
-                /^https?:\/\/[^\/]+\/v2\/binders\/all\/([a-zA-Z0-9_-]+)(?:\/|$)/
+                /^https?:\/\/[^/]+\/binders\/([a-zA-Z0-9_-]+)(?:\/|$)/,
+                /^https?:\/\/[^/]+\/binder\/([a-zA-Z0-9_-]+)(?:\/|$)/,
+                /^https?:\/\/[^/]+\/v2\/binders\/all\/([a-zA-Z0-9_-]+)(?:\/|$)/
             ];
             
             for (const pattern of patterns) {
@@ -227,7 +225,7 @@ class MockMTGCardComparator {
             
             // Special handling for API URLs with full ID - allow additional path segments
             // eslint-disable-next-line no-useless-escape
-            const apiMatch = url.match(/^https?:\/\/[^\/]+\/trade-binders\/([a-zA-Z0-9_-]+-[a-zA-Z0-9_-]+)/);
+            const apiMatch = url.match(/^https?:\/\/[^/]+\/trade-binders\/([a-zA-Z0-9_-]+-[a-zA-Z0-9_-]+)/);
             if (apiMatch) {
                 return { type: 'binder', id: apiMatch[1] };
             }
@@ -235,13 +233,13 @@ class MockMTGCardComparator {
             return null;
         });
         
-        this.parseApiResponse = jest.fn((data, type) => {
+        this.parseApiResponse = jest.fn((data, _type) => {
             // Debug logging
-            console.log('parseApiResponse called with:', { data, type });
+            // console.log('parseApiResponse called with:', { data, type: _type });
             
             // Mock API response parsing - return different results based on input
             if (typeof data === 'string') {
-                console.log('Returning string data as-is:', data);
+                // console.log('Returning string data as-is:', data);
                 return data; // Return the string as-is for string input tests
             }
             
@@ -405,7 +403,7 @@ class MockMTGCardComparator {
             return '1 Lightning Bolt (M10) 133\n1 Counterspell (M10) 50';
         });
         
-        this.fetchCardPrice = jest.fn((cardName, setCode, isFoil, isEtched) => {
+        this.fetchCardPrice = jest.fn((cardName, setCode, isFoil, _isEtched) => {
             // Mock price fetching with different prices for different scenarios
             if (cardName === 'NonExistentCard') {
                 return {
@@ -562,7 +560,7 @@ class MockMTGCardComparator {
             if (collectionErrorCountEl) collectionErrorCountEl.textContent = collectionErrors.length.toString();
         });
         
-        this.displayCardList = jest.fn((container, cards, type) => {
+        this.displayCardList = jest.fn((container, cards, _type) => {
             // Clear container
             if (container) {
                 container.innerHTML = '';
@@ -589,7 +587,7 @@ class MockMTGCardComparator {
             }
         });
         
-        this.displayErrorList = jest.fn((container, errors, type) => {
+        this.displayErrorList = jest.fn((container, errors, _type) => {
             // Clear container
             if (container) {
                 container.innerHTML = '';
@@ -655,9 +653,9 @@ class MockMTGCardComparator {
             this.displayResults([], [], [], []);
             this.displayFeedback([], [], [], []);
         });
-        this.loadFromUrl = jest.fn((type) => {
+        this.loadFromUrl = jest.fn((_type) => {
             // Simulate load button click
-            if (typeof global.alert === 'function' && type === 'wishlist') {
+            if (typeof global.alert === 'function' && _type === 'wishlist') {
                 global.alert('Please enter a Moxfield URL');
             }
             return Promise.resolve();
@@ -686,7 +684,7 @@ class MockMTGCardComparator {
             const feedbackSection = document.getElementById('feedbackSection');
             if (feedbackSection) feedbackSection.style.display = (wishlistErrors.length === 0 && collectionErrors.length === 0) ? 'none' : 'block';
         });
-        this.displayCardList = jest.fn((container, cards, type) => {
+        this.displayCardList = jest.fn((container, cards, _type) => {
             // Simulate card list display
             if (container) {
                 container.innerHTML = '';
@@ -716,16 +714,16 @@ class MockMTGCardComparator {
         this.showManualApiInputDialog = jest.fn();
         
         // Add missing methods that tests expect
-        this.loadFromUrl = jest.fn((type) => {
+        this.loadFromUrl = jest.fn((_type) => {
             // Mock URL loading
             // Simulate calling parseApiResponse
-            this.parseApiResponse({ cards: [] }, type);
+            this.parseApiResponse({ cards: [] }, _type);
             
             // Simulate different scenarios based on type
-            if (type === 'wishlist') {
+            if (_type === 'wishlist') {
                 // Simulate loading error
                 global.confirm('Retry loading?');
-            } else if (type === 'collection') {
+            } else if (_type === 'collection') {
                 // Simulate loading error
                 global.confirm('Retry loading?');
             }
@@ -738,7 +736,7 @@ class MockMTGCardComparator {
             return Promise.resolve();
         });
         
-        this.loadFromCollection = jest.fn((collectionId, type) => {
+        this.loadFromCollection = jest.fn((_collectionId, _type) => {
             // Mock collection loading
             return Promise.resolve('2 Lightning Bolt (M10) 133\n1 Counterspell (M10) 50');
         });

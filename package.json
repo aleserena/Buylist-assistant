@@ -2,7 +2,7 @@
   "name": "mtg-card-list-comparator",
   "version": "1.0.0",
   "description": "A tool to compare MTG wishlists with collections",
-  "main": "script.js",
+  "main": "src/app.js",
   "scripts": {
     "test": "jest",
     "test:watch": "jest --watch",

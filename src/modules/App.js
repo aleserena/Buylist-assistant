@@ -26,35 +26,47 @@ export class App {
      */
     bindEvents() {
         // Search button
-        this.ui.searchBtn.addEventListener('click', () => {
-            this.performSearch();
-        });
+        if (this.ui.searchBtn) {
+            this.ui.searchBtn.addEventListener('click', () => {
+                this.performSearch();
+            });
+        }
         
         // URL loading buttons
-        this.ui.loadWishlistBtn.addEventListener('click', () => {
-            this.loadFromUrl('wishlist');
-        });
-        this.ui.loadCollectionBtn.addEventListener('click', () => {
-            this.loadFromUrl('collection');
-        });
+        if (this.ui.loadWishlistBtn) {
+            this.ui.loadWishlistBtn.addEventListener('click', () => {
+                this.loadFromUrl('wishlist');
+            });
+        }
+        if (this.ui.loadCollectionBtn) {
+            this.ui.loadCollectionBtn.addEventListener('click', () => {
+                this.loadFromUrl('collection');
+            });
+        }
         
         // Price provider change
         document.addEventListener('priceProviderChanged', () => {
+            // Clear price cache when provider changes
+            this.priceService.clearCache();
             this.refreshAllPrices();
         });
         
         // Card price updates
         document.addEventListener('cardPriceUpdate', (event) => {
-            const { cardElement, card, type } = event.detail;
-            this.priceService.updateCardPrice(cardElement, card, type);
+            const { cardElement, card, type } = event.detail || {};
+            if (cardElement) {
+                this.priceService.updateCardPrice(cardElement, card, type);
+            }
         });
     }
 
     /**
      * Perform the main search functionality
      */
-    performSearch() {
+    async performSearch() {
         const inputs = this.ui.getInputValues();
+        // Enable provider fallback for UI fetches (tests that call PriceService directly remain unaffected)
+        this.priceService.fallbackEnabled = true;
         
         // Parse wishlist
         const wishlistResult = this.cardParser.parseCardList(
@@ -90,6 +102,11 @@ export class App {
             wishlistResult.cards,
             collectionResult.cards
         );
+        
+        // Refresh prices after displaying results
+        if (matches.length > 0 || missing.length > 0) {
+            await this.refreshAllPrices();
+        }
     }
 
     /**
@@ -333,9 +350,17 @@ export class App {
         const inputs = this.ui.getInputValues();
         const { priceProvider } = inputs;
         
+        // Show loading state for prices
+        this.ui.showPriceLoadingState();
+        
         // Get all card elements
         const matchElements = document.querySelectorAll('#matchesList .card-item');
         const missingElements = document.querySelectorAll('#missingList .card-item');
+        
+        let totalMatchesPrice = 0;
+        let pricedMatchesCount = 0;
+        let totalMissingPrice = 0;
+        let pricedMissingCount = 0;
         
         // Refresh match prices
         for (const element of matchElements) {
@@ -344,6 +369,14 @@ export class App {
                 // Use collection card data for pricing when available
                 const { collection } = cardData;
                 const collectionCard = collection || cardData;
+                
+                // Show loading state for this card
+                const priceElement = element.querySelector('.card-price');
+                if (priceElement) {
+                    priceElement.textContent = 'Loading...';
+                    priceElement.classList.add('loading');
+                }
+                
                 const priceData = await this.priceService.fetchCardPrice(
                     collectionCard.name,
                     collectionCard.set,
@@ -352,12 +385,52 @@ export class App {
                     priceProvider
                 );
                 
-                const { price } = priceData;
+                const { price, isFallback, fallbackReason } = priceData;
                 if (price) {
-                    const priceElement = element.querySelector('.card-price');
                     if (priceElement) {
-                        priceElement.textContent = `$${price}`;
+                        const providerConfig = this.priceService.providers[priceProvider] || this.priceService.providers.tcgplayer;
+                        const currencySymbol = (providerConfig.priceField === 'eur') ? '\u20AC' : (providerConfig.priceField === 'tix' ? 'Tix' : '$');
+                        const qty = cardData.quantity || 1;
+                        const unit = parseFloat(price);
+                        const total = isNaN(unit) ? null : unit * qty;
+                        
+                        if (isFallback) {
+                            const totalText = total !== null ? `${currencySymbol}${total.toFixed(2)}` : `${currencySymbol}${price}`;
+                            const unitText = !isNaN(unit) ? ` (${currencySymbol}${unit.toFixed(2)} ea)` : '';
+                            priceElement.innerHTML = `
+                                <span class="fallback-price">
+                                    <span class="fallback-icon">⚠️</span>
+                                    ${totalText}${unitText}
+                                    <span class="fallback-tooltip" title="${fallbackReason}">ⓘ</span>
+                                </span>
+                            `;
+                            priceElement.classList.add('fallback');
+                        } else {
+                            if (total !== null) {
+                                priceElement.textContent = `${currencySymbol}${total.toFixed(2)} (${currencySymbol}${unit.toFixed(2)} ea)`;
+                            } else {
+                                priceElement.textContent = `${currencySymbol}${price}`;
+                            }
+                            priceElement.classList.remove('fallback');
+                        }
+                        // Record totals on element for sorting and later use
+                        element.dataset.priceUnit = isNaN(unit) ? '' : String(unit.toFixed(2));
+                        element.dataset.priceTotal = total !== null ? String(total.toFixed(2)) : '';
+                        priceElement.classList.remove('loading');
                         priceElement.classList.add('has-price');
+                        
+                        // Add to total price calculation
+                        const quantity = cardData.quantity || 1;
+                        const cardTotal = (isNaN(unit) ? 0 : unit) * quantity;
+                        totalMatchesPrice += cardTotal;
+                        pricedMatchesCount++;
+                    }
+                } else {
+                    if (priceElement) {
+                        priceElement.textContent = 'Price not available';
+                        priceElement.classList.remove('loading');
+                        priceElement.classList.remove('has-price');
+                        priceElement.classList.remove('fallback');
                     }
                 }
             }
@@ -367,6 +440,13 @@ export class App {
         for (const element of missingElements) {
             const cardData = this.ui.getCardDataFromElement(element, 'missing');
             if (cardData) {
+                // Show loading state for this card
+                const priceElement = element.querySelector('.card-price');
+                if (priceElement) {
+                    priceElement.textContent = 'Loading...';
+                    priceElement.classList.add('loading');
+                }
+                
                 const priceData = await this.priceService.fetchCardPrice(
                     cardData.name,
                     cardData.set,
@@ -375,16 +455,61 @@ export class App {
                     priceProvider
                 );
                 
-                const { price } = priceData;
+                const { price, isFallback, fallbackReason } = priceData;
                 if (price) {
-                    const priceElement = element.querySelector('.card-price');
                     if (priceElement) {
-                        priceElement.textContent = `$${price}`;
+                        const providerConfig = this.priceService.providers[priceProvider] || this.priceService.providers.tcgplayer;
+                        const currencySymbol = (providerConfig.priceField === 'eur') ? '\u20AC' : (providerConfig.priceField === 'tix' ? 'Tix' : '$');
+                        const qty2 = cardData.quantity || 1;
+                        const unit2 = parseFloat(price);
+                        const total2 = isNaN(unit2) ? null : unit2 * qty2;
+                        
+                        if (isFallback) {
+                            const totalText2 = total2 !== null ? `${currencySymbol}${total2.toFixed(2)}` : `${currencySymbol}${price}`;
+                            const unitText2 = !isNaN(unit2) ? ` (${currencySymbol}${unit2.toFixed(2)} ea)` : '';
+                            priceElement.innerHTML = `
+                                <span class="fallback-price">
+                                    <span class="fallback-icon">⚠️</span>
+                                    ${totalText2}${unitText2}
+                                    <span class="fallback-tooltip" title="${fallbackReason}">ⓘ</span>
+                                </span>
+                            `;
+                            priceElement.classList.add('fallback');
+                        } else {
+                            if (total2 !== null) {
+                                priceElement.textContent = `${currencySymbol}${total2.toFixed(2)} (${currencySymbol}${unit2.toFixed(2)} ea)`;
+                            } else {
+                                priceElement.textContent = `${currencySymbol}${price}`;
+                            }
+                            priceElement.classList.remove('fallback');
+                        }
+                        // Record totals on element for sorting and later use
+                        element.dataset.priceUnit = isNaN(unit2) ? '' : String(unit2.toFixed(2));
+                        element.dataset.priceTotal = total2 !== null ? String(total2.toFixed(2)) : '';
+                        priceElement.classList.remove('loading');
                         priceElement.classList.add('has-price');
+                        // Accumulate missing totals
+                        const quantity2 = cardData.quantity || 1;
+                        const cardTotal2 = (isNaN(unit2) ? 0 : unit2) * quantity2;
+                        totalMissingPrice += cardTotal2;
+                        pricedMissingCount++;
+                    }
+                } else {
+                    if (priceElement) {
+                        priceElement.textContent = 'Price not available';
+                        priceElement.classList.remove('loading');
+                        priceElement.classList.remove('has-price');
+                        priceElement.classList.remove('fallback');
                     }
                 }
             }
         }
+        
+        // Hide loading state
+        this.ui.hidePriceLoadingState();
+        
+        // Update total price display (matches + missing)
+        this.ui.updateTotalPrice(totalMatchesPrice, pricedMatchesCount, totalMissingPrice, pricedMissingCount);
     }
 
     /**
@@ -406,3 +531,4 @@ export class App {
         };
     }
 } 
+

@@ -25,8 +25,6 @@ const server = http.createServer((req, res) => {
         return;
     }
     
-    console.log(`Proxying request to: ${targetUrl}`);
-    
     // Parse the URL
     const parsedUrl = url.parse(targetUrl);
     const isHttps = parsedUrl.protocol === 'https:';
@@ -51,7 +49,6 @@ const server = http.createServer((req, res) => {
     });
     
     proxyReq.on('error', (err) => {
-        console.error('Proxy error:', err);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Proxy error', message: err.message }));
     });
@@ -61,14 +58,12 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-    console.log(`CORS Proxy server running on http://localhost:${PORT}`);
-    console.log(`Usage: http://localhost:${PORT}/https://api2.moxfield.com/v2/decks/all/your-deck-id`);
+    // CORS Proxy server running on http://localhost:${PORT}
+    // Usage: http://localhost:${PORT}/https://api2.moxfield.com/v2/decks/all/your-deck-id
 });
 
 process.on('SIGINT', () => {
-    console.log('\nShutting down CORS proxy server...');
     server.close(() => {
-        console.log('Server closed');
         process.exit(0);
     });
 }); 
