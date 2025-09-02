@@ -10,15 +10,15 @@
     <div class="container">
         <header>
             <h1>MTG Card List Comparator</h1>
-            <p>Compare your wishlist with your collection to see what cards you already own</p>
+            <p>Compare your wishlist with a collection to see what cards you can buy</p>
         </header>
 
         <div class="input-section">
             <div class="input-group">
                 <label for="wishlist">Wishlist Cards:</label>
                 <div class="input-tabs">
-                    <button class="input-tab-btn active" data-input-tab="wishlist-text">Text</button>
-                    <button class="input-tab-btn" data-input-tab="wishlist-url">Moxfield URL</button>
+                    <button class="input-tab-btn active" data-input-tab="wishlistTextTab">Text</button>
+                    <button class="input-tab-btn" data-input-tab="wishlistUrlTab">Moxfield URL</button>
                 </div>
                 <div class="input-content active" id="wishlistTextTab">
                     <textarea id="wishlist" placeholder="Paste your wishlist here (Moxfield format)&#10;Example:&#10;1 Aether Channeler (DMU) 42 *F*&#10;2 Lightning Bolt (M10) 133"></textarea>
@@ -39,8 +39,8 @@
             <div class="input-group">
                 <label for="collection">Collection Cards:</label>
                 <div class="input-tabs">
-                    <button class="input-tab-btn active" data-input-tab="collection-text">Text</button>
-                    <button class="input-tab-btn" data-input-tab="collection-url">Moxfield URL</button>
+                    <button class="input-tab-btn active" data-input-tab="collectionTextTab">Text</button>
+                    <button class="input-tab-btn" data-input-tab="collectionUrlTab">Moxfield URL</button>
                 </div>
                 <div class="input-content active" id="collectionTextTab">
                     <textarea id="collection" placeholder="Paste your collection here (Moxfield format)&#10;Example:&#10;1 Aether Channeler (DMU) 42 *F*&#10;3 Lightning Bolt (M10) 133"></textarea>
@@ -68,14 +68,11 @@
                 </label>
             </div>
             <div class="option-group">
-                <label for="priceProvider" class="price-provider-label">Price Provider:</label>
+                <label for="priceProvider" class="price-provider-label">Price Source:</label>
                 <select id="priceProvider" class="price-provider-select">
-                    <option value="cardkingdom">Card Kingdom</option>
-                    <option value="tcgplayer">TCGPlayer</option>
-                    <option value="starcitygames">Star City Games</option>
-                    <option value="coolstuffinc">CoolStuffInc</option>
-                    <option value="cardhoarder">CardHoarder</option>
-                    <option value="cardmarket">CardMarket</option>
+                    <option value="tcgplayer">TCGPlayer (USD)</option>
+                    <option value="cardmarket">Cardmarket (EUR)</option>
+                    <option value="cardhoarder">Cardhoarder (MTGO Tix)</option>
                 </select>
             </div>
         </div>
@@ -84,60 +81,106 @@
 
         <div class="results-section" id="resultsSection" style="display: none;">
             <h2>Results</h2>
+            <div class="results-legend">
+                <span class="legend-label">Legend:</span>
+                <span class="badge badge-foil" title="Foil" aria-label="Foil"><svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14"><path d="M12 17.27L18.18 21 16.54 13.97 22 9.24 14.81 8.63 12 2 9.19 8.63 2 9.24 7.46 13.97 5.82 21z" fill="currentColor"/></svg></span>
+                <span class="legend-text">Foil</span>
+                <span class="badge badge-etched" title="Etched" aria-label="Etched"><svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14"><path d="M12 2L22 12 12 22 2 12z" fill="currentColor"/></svg></span>
+                <span class="legend-text">Etched</span>
+            </div>
             <div class="results-stats">
                 <div class="stat">
-                    <span class="stat-number" id="totalWishlist">0</span>
-                    <span class="stat-label">Cards in Wishlist</span>
+                    <span class="stat-label">Total Wishlist:</span>
+                    <span class="stat-value" id="totalWishlist">0</span>
                 </div>
                 <div class="stat">
-                    <span class="stat-number" id="totalCollection">0</span>
-                    <span class="stat-label">Cards in Collection</span>
+                    <span class="stat-label">Total Collection:</span>
+                    <span class="stat-value" id="totalCollection">0</span>
                 </div>
                 <div class="stat">
-                    <span class="stat-number" id="matchesFound">0</span>
-                    <span class="stat-label">Matches Found</span>
+                    <span class="stat-label">Matches Found:</span>
+                    <span class="stat-value" id="matchesFound">0</span>
                 </div>
             </div>
-            
+
             <div class="results-tabs">
-                <button class="tab-btn active" data-tab="matches">Matches (<span id="matchesCount">0</span>)</button>
-                <button class="tab-btn" data-tab="missing">Missing (<span id="missingCount">0</span>)</button>
+                <button class="tab-btn active" data-tab="matches">
+                    Matches <span class="tab-count" id="matchesCount">0</span>
+                </button>
+                <button class="tab-btn" data-tab="missing">
+                    Missing <span class="tab-count" id="missingCount">0</span>
+                </button>
             </div>
 
             <div class="tab-content active" id="matchesTab">
+                <div class="list-controls">
+                    <label>Sort:
+                        <select id="matchesSort">
+                            <option value="name">Name</option>
+                            <option value="set">Set</option>
+                            <option value="quantity">Quantity</option>
+                            <option value="price">Price</option>
+                        </select>
+                    </label>
+                    <label class="chk"><input type="checkbox" id="matchesFilterFoil"> Foil</label>
+                    <label class="chk"><input type="checkbox" id="matchesFilterEtched"> Etched</label>
+                    <button id="matchesReset" class="small-btn" type="button">Reset</button>
+                </div>
                 <div class="card-list" id="matchesList"></div>
             </div>
 
             <div class="tab-content" id="missingTab">
+                <div class="list-controls">
+                    <label>Sort:
+                        <select id="missingSort">
+                            <option value="name">Name</option>
+                            <option value="set">Set</option>
+                            <option value="quantity">Quantity</option>
+                            <option value="price">Price</option>
+                        </select>
+                    </label>
+                    <label class="chk"><input type="checkbox" id="missingFilterFoil"> Foil</label>
+                    <label class="chk"><input type="checkbox" id="missingFilterEtched"> Etched</label>
+                    <button id="exportMissing" class="small-btn" type="button">Export CSV</button>
+                    <button id="missingReset" class="small-btn" type="button">Reset</button>
+                </div>
                 <div class="card-list" id="missingList"></div>
             </div>
         </div>
 
         <div class="feedback-section" id="feedbackSection" style="display: none;">
-            <h3>Parsing Errors</h3>
-            <div class="feedback-stats">
-                <div class="feedback-stat">
-                    <span class="feedback-stat-number" id="wishlistParsed">0</span>
-                    <span class="feedback-stat-label">Wishlist Cards Parsed</span>
-                </div>
-                <div class="feedback-stat">
-                    <span class="feedback-stat-number" id="collectionParsed">0</span>
-                    <span class="feedback-stat-label">Collection Cards Parsed</span>
-                </div>
-            </div>
+            <h2>Feedback</h2>
             <div class="feedback-tabs">
-                <button class="feedback-tab-btn active" data-feedback-tab="wishlist">Wishlist Errors (<span id="wishlistErrorCount">0</span>)</button>
-                <button class="feedback-tab-btn" data-feedback-tab="collection">Collection Errors (<span id="collectionErrorCount">0</span>)</button>
+                <button class="feedback-tab-btn active" data-feedback-tab="wishlist">
+                    Wishlist <span class="feedback-count" id="wishlistErrorCount">0</span>
+                </button>
+                <button class="feedback-tab-btn" data-feedback-tab="collection">
+                    Collection <span class="feedback-count" id="collectionErrorCount">0</span>
+                </button>
             </div>
-            <div class="feedback-content active" id="wishlistFeedbackTab">
+
+            <div class="feedback-content active" id="wishlist">
+                <div class="feedback-stats">
+                    <div class="feedback-stat">
+                        <span class="feedback-stat-label">Parsed Cards:</span>
+                        <span class="feedback-stat-value" id="wishlistParsed">0</span>
+                    </div>
+                </div>
                 <div class="error-list" id="wishlistErrorList"></div>
             </div>
-            <div class="feedback-content" id="collectionFeedbackTab">
+
+            <div class="feedback-content" id="collection">
+                <div class="feedback-stats">
+                    <div class="feedback-stat">
+                        <span class="feedback-stat-label">Parsed Cards:</span>
+                        <span class="feedback-stat-value" id="collectionParsed">0</span>
+                    </div>
+                </div>
                 <div class="error-list" id="collectionErrorList"></div>
             </div>
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script type="module" src="src/app.js"></script>
 </body>
 </html> 

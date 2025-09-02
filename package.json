@@ -2,13 +2,14 @@
   "name": "mtg-card-list-comparator",
   "version": "1.0.0",
   "description": "A tool to compare MTG wishlists with collections",
-  "main": "script.js",
+  "main": "src/app.js",
   "scripts": {
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "lint": "eslint script.js",
-    "lint:fix": "eslint script.js --fix",
+    "lint": "eslint src/**/*.js tests/**/*.js",
+    "lint:fix": "eslint src/**/*.js tests/**/*.js --fix",
+    "proxy": "node cors-proxy.js",
     "build": "echo 'No build step required for static HTML/CSS/JS'",
     "start": "python3 -m http.server 8000",
     "serve": "python3 -m http.server 8000"
@@ -37,7 +38,7 @@
     "testEnvironment": "jsdom",
     "setupFilesAfterEnv": ["<rootDir>/tests/setup.js"],
     "collectCoverageFrom": [
-      "script.js",
+      "src/**/*.js",
       "!**/node_modules/**",
       "!**/coverage/**",
       "!**/tests/**"
@@ -54,7 +55,14 @@
     },
     "testMatch": [
       "**/tests/**/*.test.js"
-    ]
+    ],
+    "transform": {
+      "^.+\\.js$": "babel-jest"
+    },
+    "moduleFileExtensions": ["js", "json"],
+    "testEnvironmentOptions": {
+      "url": "http://localhost"
+    }
   },
   "browserslist": [
     "> 1%",

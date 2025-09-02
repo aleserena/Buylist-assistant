@@ -101,32 +101,47 @@ npm run lint:fix
 
 The project uses GitHub Actions for continuous integration and deployment:
 
-#### Pipeline Stages
+#### **CI Pipeline** (`.github/workflows/ci.yml`)
+- ✅ **Testing**: Runs Jest tests on Node.js 20.x
+- ✅ **Linting**: ESLint code quality checks
+- ✅ **Coverage**: Test coverage reporting
+- ✅ **Security**: npm audit for vulnerability scanning
 
-1. **Test Stage**
-   - Runs on Node.js 18.x and 20.x
-   - Executes all unit and integration tests
-   - Generates coverage reports
-   - Uploads coverage to Codecov
+#### **Deployment Pipeline** (`.github/workflows/deploy.yml`)
+- ✅ **GitHub Pages**: Automatic deployment to GitHub Pages
+- ✅ **Testing**: Ensures all tests pass before deployment
+- ✅ **Linting**: Code quality validation
+- ✅ **Build**: Creates deployment package with all necessary files
 
-2. **Security Stage**
-   - Runs security audits
-   - Checks for known vulnerabilities
-   - Ensures code quality standards
+### GitHub Pages Deployment
 
-3. **Build Stage** (Main branch only)
-   - Creates deployment package
-   - Prepares files for deployment
+The application is automatically deployed to GitHub Pages when changes are pushed to the `master` branch.
 
-4. **Deploy Stage** (Main branch only)
-   - Deploys to GitHub Pages
-   - Makes the application publicly accessible
+#### **Live Demo**
+- **URL**: `https://[username].github.io/[repository-name]/`
+- **Status**: Automatically deployed from master branch
+- **Features**: Full functionality including Moxfield integration
 
-#### Pipeline Triggers
+#### **Deployment Files**
+- `index.html` - Main application
+- `styles.css` - Styling
+- `src/` - Modular JavaScript files
+- `404.html` - SPA support for GitHub Pages
 
-- **Push to main/develop**: Runs full test suite
-- **Pull Request**: Runs tests and security checks
-- **Push to main**: Triggers deployment to GitHub Pages
+#### **Local Development**
+```bash
+# Install dependencies
+npm install
+
+# Start local server
+npm start
+
+# Run tests
+npm test
+
+# Run linting
+npm run lint
+```
 
 ### Test Structure
 
@@ -160,6 +175,33 @@ The project maintains moderate test coverage standards:
 - Automatic linting on commit
 - Test execution before deployment
 - Coverage threshold enforcement
+
+## CORS Proxy (Optional)
+
+If you encounter CORS errors when loading from Moxfield URLs, you can use the included CORS proxy:
+
+1. Start the proxy server:
+   ```bash
+   npm run proxy
+   ```
+
+2. The proxy will run on `http://localhost:3001` and automatically handle CORS requests.
+
+3. The application will automatically try the proxy if direct requests fail.
+
+**Note for GitHub Pages:** The local CORS proxy won't work on GitHub Pages due to browser security restrictions. On GitHub Pages, you'll need to use the manual input method:
+
+1. When CORS fails, the app will show a manual input dialog
+2. Click the API URL to open it in a new tab
+3. Copy the JSON response and paste it in the dialog
+4. Submit to load your cards
+
+This is the recommended approach for GitHub Pages deployments.
+
+Alternatively, you can manually copy the API response:
+1. Open the Moxfield URL in a new tab
+2. Copy the JSON response
+3. Use the "Manual Input" option in the application
 
 ## Development
 

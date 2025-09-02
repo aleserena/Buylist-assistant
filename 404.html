@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Redirecting…</title>
+  <meta http-equiv="refresh" content="3; url=/" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 2rem; }
+    .hint { color: #666; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <h1>Page not found</h1>
+  <p>Redirecting you to the site’s home page…</p>
+  <p class="hint">If you are on GitHub Pages under a repository path, a script will attempt to redirect you to the repository root.</p>
+  <script>
+    (function () {
+      var parts = (location.pathname || '/').split('/').filter(Boolean);
+      // Project Pages URL pattern: /<user>/<repo>/...
+      // We redirect to /<repo>/ when possible; if unknown, fall back to '/'
+      var repo = parts.length > 1 ? parts[1] : '';
+      var target = repo ? (location.origin + '/' + repo + '/') : (location.origin + '/');
+      try { location.replace(target); } catch (_) { window.location = target; }
+    })();
+  </script>
+</body>
+</html>
+
