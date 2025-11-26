@@ -1,14 +1,15 @@
 /**
  * Price Service Module
- * Handles fetching and caching of card prices from Scryfall
+ * Handles fetching and caching of card prices from Scryfall and Moxfield
  */
 export class PriceService {
     constructor() {
         this.priceCache = new Map();
         this.scryfallUrl = 'https://api.scryfall.com';
+        this.moxfieldUrl = 'https://api2.moxfield.com/v2';
         this.fallbackEnabled = false;
-        
-        // Define different price sources and their Scryfall price fields
+
+        // Define different price sources and their fields
         this.providers = {
             tcgplayer: {
                 name: 'TCGPlayer',
@@ -24,18 +25,37 @@ export class PriceService {
                 name: 'Cardhoarder',
                 priceField: 'tix',
                 currency: 'MTGO Tix'
+            },
+            cardkingdom: {
+                name: 'CardKingdom',
+                priceField: 'ck',
+                currency: 'USD'
+            },
+            starcitygames: {
+                name: 'StarCityGames',
+                priceField: 'scg',
+                currency: 'USD'
+            },
+            cardtrader: {
+                name: 'CardTrader',
+                priceField: 'ct',
+                currency: 'USD'
+            },
+            coolstuffinc: {
+                name: 'CoolStuffInc',
+                priceField: 'csi',
+                currency: 'USD'
+            },
+            manapool: {
+                name: 'Manapool',
+                priceField: 'mp',
+                currency: 'USD'
             }
         };
     }
 
     /**
      * Get a cache key for price data
-     * @param {string} cardName - The card name
-     * @param {string} setCode - The set code
-     * @param {boolean} isFoil - Whether the card is foil
-     * @param {boolean} isEtched - Whether the card is etched
-     * @param {string} provider - The price provider
-     * @returns {string} - The cache key
      */
     getPriceCacheKey(cardName, setCode, isFoil, isEtched, provider) {
         return `${cardName.toLowerCase()}|${setCode.toLowerCase()}|${isFoil}|${isEtched}|${provider}`;
@@ -43,191 +63,73 @@ export class PriceService {
 
     /**
      * Determine the appropriate Scryfall price field(s) for a provider
-     * considering foil/etched flags. Returns a prioritized list.
      */
     getProviderPriceFields(providerKey, isFoil, isEtched) {
         switch (providerKey) {
-        case 'tcgplayer':
-            if (isEtched) return ['usd_etched', 'usd_foil', 'usd'];
-            if (isFoil) return ['usd_foil', 'usd'];
-            return ['usd'];
-        case 'cardmarket':
-            if (isFoil) return ['eur_foil', 'eur'];
-            return ['eur'];
-        case 'cardhoarder':
-            if (isFoil) return ['tix_foil', 'tix'];
-            return ['tix'];
-        default:
-            return ['usd'];
+            case 'tcgplayer':
+                if (isEtched) return ['usd_etched', 'usd_foil', 'usd'];
+                if (isFoil) return ['usd_foil', 'usd'];
+                return ['usd'];
+            case 'cardmarket':
+                if (isFoil) return ['eur_foil', 'eur'];
+                return ['eur'];
+            case 'cardhoarder':
+                if (isFoil) return ['tix_foil', 'tix'];
+                return ['tix'];
+            default:
+                // For Moxfield providers (ck, scg, etc.)
+                const base = this.providers[providerKey]?.priceField || providerKey;
+                if (isFoil) return [`${base}_foil`, base];
+                return [base, `${base}_foil`];
         }
     }
 
     /**
-     * Extract a price from a Scryfall prices object for a given provider,
-     * trying foil/etched variants and falling back to base when needed.
+     * Extract a price from a prices object for a given provider
      */
     getPriceForProvider(prices, providerKey, isFoil, isEtched) {
         const fields = this.getProviderPriceFields(providerKey, isFoil, isEtched);
         for (const f of fields) {
-            if (prices && prices[f]) return { price: prices[f], field: f };
+            if (prices && prices[f] !== undefined && prices[f] !== null) return { price: prices[f], field: f };
         }
         return { price: null, field: fields[fields.length - 1] };
     }
 
     /**
-     * Fetch card price from Scryfall API
-     * 
-     * Note: Moxfield API does not provide pricing data. All pricing comes from Scryfall's API,
-     * which aggregates prices from three main sources:
-     * - TCGPlayer: usd (USD prices from TCGPlayer marketplace)
-     * - Cardmarket: eur (Euro prices from Cardmarket)
-     * - Cardhoarder: tix (MTGO ticket prices from Cardhoarder)
-     * 
-     * Each provider uses only its specific price field. If the price is not available, null is returned.
-     * 
-     * @param {string} cardName - The card name
-     * @param {string} setCode - The set code
-     * @param {boolean} isFoil - Whether the card is foil
-     * @param {boolean} isEtched - Whether the card is etched
-     * @param {string} provider - The price source (tcgplayer, cardmarket, cardhoarder)
-     * @returns {Promise<Object>} - Price data object
+     * Fetch card price from API (Scryfall or Moxfield)
      */
     async fetchCardPrice(cardName, setCode = '', isFoil = false, isEtched = false, provider = 'tcgplayer', options = undefined) {
+        // Handle options object if passed as 5th argument (legacy support)
+        if (typeof provider === 'object') {
+            options = provider;
+            provider = options.provider || 'tcgplayer';
+        }
+
+        // Default to tcgplayer if provider is unknown
+        if (!this.providers[provider]) {
+            provider = 'tcgplayer';
+        }
+
         const fallbackEnabled = options && Object.prototype.hasOwnProperty.call(options, 'fallback')
             ? !!options.fallback
             : !!this.fallbackEnabled;
         const providerKey = provider + (fallbackEnabled ? ':fb' : '');
         const cacheKey = this.getPriceCacheKey(cardName, setCode, isFoil, isEtched, providerKey);
-        
-        // Check cache first
+
         if (this.priceCache.has(cacheKey)) {
             return this.priceCache.get(cacheKey);
         }
 
+        // Determine which API to use
+        const scryfallProviders = ['tcgplayer', 'cardmarket', 'cardhoarder'];
+        const isScryfall = scryfallProviders.includes(provider);
+
         try {
-            // Build search query
-            let searchQuery = cardName;
-            if (setCode) {
-                searchQuery += ` set:${setCode}`;
-            }
-
-            const response = await fetch(`${this.scryfallUrl}/cards/search?q=${encodeURIComponent(searchQuery)}`);
-            
-            if (!response.ok) {
-                const providerConfig = this.providers[provider] || this.providers.tcgplayer;
-                if (response.status === 429) {
-                    return {
-                        price: null,
-                        error: 'Rate limit exceeded. Please try again later.',
-                        cardName,
-                        provider: providerConfig.name
-                    };
-                }
-                return {
-                    price: null,
-                    error: `HTTP ${response.status}`,
-                    cardName,
-                    provider: providerConfig.name
-                };
-            }
-
-            const data = await response.json();
-            
-            if (!data.data || data.data.length === 0) {
-                const providerConfig = this.providers[provider] || this.providers.tcgplayer;
-                return {
-                    price: null,
-                    error: 'Card not found',
-                    cardName,
-                    provider: providerConfig.name
-                };
-            }
-
-            // Find the best match (exact name match first, then partial)
-            let bestMatch = null;
-            
-            // First try exact name match
-            for (const card of data.data) {
-                if (card.name.toLowerCase() === cardName.toLowerCase()) {
-                    bestMatch = card;
-                    break;
-                }
-            }
-            
-            // If no exact match, try partial match
-            if (!bestMatch) {
-                for (const card of data.data) {
-                    if (card.name.toLowerCase().includes(cardName.toLowerCase()) ||
-                        cardName.toLowerCase().includes(card.name.toLowerCase())) {
-                        bestMatch = card;
-                        break;
-                    }
-                }
-            }
-            
-            if (!bestMatch) {
-                const providerConfig = this.providers[provider] || this.providers.tcgplayer;
-                return {
-                    price: null,
-                    error: 'No matching card found',
-                    cardName,
-                    provider: providerConfig.name
-                };
-            }
-
-            const primary = (this.providers[provider] ? provider : 'tcgplayer');
-            if (fallbackEnabled) {
-                // Try primary, then fallbacks
-                const tryOrder = ['tcgplayer', 'cardmarket', 'cardhoarder'];
-                const order = [primary, ...tryOrder.filter(p => p !== primary)];
-                let final = null;
-                for (const key of order) {
-                    const conf = this.providers[key];
-                    const { price: p } = this.getPriceForProvider(bestMatch.prices, key, isFoil, isEtched);
-                    if (p) {
-                        final = {
-                            price: p,
-                            cardName: bestMatch.name,
-                            setCode: bestMatch.set,
-                            provider: conf.name,
-                            currency: conf.currency,
-                            isFallback: key !== primary,
-                            fallbackReason: key !== primary ? `Missing price for selected provider; used ${conf.name}` : ''
-                        };
-                        break;
-                    }
-                }
-                if (!final) {
-                    const providerConfig = this.providers[primary];
-                    final = {
-                        price: null,
-                        error: 'Price not available from any provider',
-                        cardName: bestMatch.name,
-                        provider: providerConfig.name,
-                        currency: providerConfig.currency,
-                        isFallback: false,
-                        fallbackReason: ''
-                    };
-                }
-                this.priceCache.set(cacheKey, final);
-                return final;
+            if (isScryfall) {
+                return await this.fetchScryfallPrice(cardName, setCode, isFoil, isEtched, provider, fallbackEnabled, cacheKey);
             } else {
-                // No fallback: only use selected provider
-                const providerConfig = this.providers[primary];
-                const { price: p } = this.getPriceForProvider(bestMatch.prices, primary, isFoil, isEtched);
-                const result = {
-                    price: p,
-                    cardName: bestMatch.name,
-                    setCode: bestMatch.set,
-                    provider: providerConfig.name,
-                    currency: providerConfig.currency,
-                    isFallback: false,
-                    fallbackReason: ''
-                };
-                this.priceCache.set(cacheKey, result);
-                return result;
+                return await this.fetchMoxfieldPrice(cardName, setCode, isFoil, isEtched, provider, fallbackEnabled, cacheKey);
             }
-            
         } catch (error) {
             const providerConfig = this.providers[provider] || this.providers.tcgplayer;
             return {
@@ -240,21 +142,147 @@ export class PriceService {
     }
 
     /**
-     * Update card price in the UI
-     * @param {Element} cardElement - The card element
-     * @param {Object} priceData - The price data
-     * @param {string} _type - The type (unused parameter)
+     * Fetch price from Scryfall
+     */
+    async fetchScryfallPrice(cardName, setCode, isFoil, isEtched, provider, fallbackEnabled, cacheKey) {
+        let searchQuery = cardName;
+        if (setCode) {
+            searchQuery += ` set:${setCode}`;
+        }
+
+        const response = await fetch(`${this.scryfallUrl}/cards/search?q=${encodeURIComponent(searchQuery)}`);
+
+        if (!response.ok) {
+            throw new Error(`Scryfall API error: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (!data.data || data.data.length === 0) {
+            throw new Error('Card not found');
+        }
+
+        // Find best match
+        let bestMatch = data.data[0];
+        if (setCode) {
+            const exactMatch = data.data.find(c => c.set.toLowerCase() === setCode.toLowerCase());
+            if (exactMatch) bestMatch = exactMatch;
+        }
+
+        return this.processPriceResult(bestMatch, bestMatch.prices, provider, fallbackEnabled, cacheKey, isFoil, isEtched);
+    }
+
+    /**
+     * Fetch price from Moxfield
+     * Note: Moxfield API blocks CORS, so this will only work with a local proxy or browser extension
+     */
+    async fetchMoxfieldPrice(cardName, setCode, isFoil, isEtched, provider, fallbackEnabled, cacheKey) {
+        const moxfieldApiUrl = `${this.moxfieldUrl}/cards/search?q=${encodeURIComponent(cardName)}`;
+
+        try {
+            const response = await fetch(moxfieldApiUrl);
+
+            if (!response.ok) {
+                throw new Error(`Moxfield API error: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+
+            if (!data.data || data.data.length === 0) {
+                throw new Error('Card not found');
+            }
+
+            // Find exact match for name and set
+            let bestMatch = data.data.find(c => c.name.toLowerCase() === cardName.toLowerCase());
+
+            if (!bestMatch) {
+                bestMatch = data.data[0];
+            }
+
+            if (setCode) {
+                const setMatch = data.data.find(c =>
+                    c.name.toLowerCase() === cardName.toLowerCase() &&
+                    c.set.toLowerCase() === setCode.toLowerCase()
+                );
+                if (setMatch) bestMatch = setMatch;
+            }
+
+            return this.processPriceResult(bestMatch, bestMatch.prices, provider, fallbackEnabled, cacheKey, isFoil, isEtched);
+        } catch (error) {
+            // If CORS blocks it, throw an error that will be caught by the caller
+            if (error.message.includes('CORS') || error.message.includes('Failed to fetch')) {
+                throw new Error('Moxfield price unavailable (CORS blocked). Try TCGPlayer, Cardmarket, or Cardhoarder instead.');
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Process the price result and handle fallbacks
+     */
+    processPriceResult(cardData, prices, primaryProvider, fallbackEnabled, cacheKey, isFoil, isEtched) {
+        const primaryConfig = this.providers[primaryProvider];
+
+        if (fallbackEnabled) {
+            // Try primary, then fallbacks
+            const availableProviders = Object.keys(this.providers);
+            const order = [primaryProvider, ...availableProviders.filter(p => p !== primaryProvider)];
+
+            let final = null;
+            for (const key of order) {
+                const conf = this.providers[key];
+                const { price: p } = this.getPriceForProvider(prices, key, isFoil, isEtched);
+                if (p !== null) {
+                    final = {
+                        price: p,
+                        cardName: cardData.name,
+                        setCode: cardData.set,
+                        provider: conf.name,
+                        currency: conf.currency,
+                        isFallback: key !== primaryProvider,
+                        fallbackReason: key !== primaryProvider ? `Missing price for selected provider; used ${conf.name}` : ''
+                    };
+                    break;
+                }
+            }
+
+            if (!final) {
+                final = {
+                    price: null,
+                    error: 'Price not available',
+                    cardName: cardData.name,
+                    provider: primaryConfig.name
+                };
+            }
+
+            this.priceCache.set(cacheKey, final);
+            return final;
+        } else {
+            const { price: p } = this.getPriceForProvider(prices, primaryProvider, isFoil, isEtched);
+
+            const result = {
+                price: p,
+                cardName: cardData.name,
+                setCode: cardData.set,
+                provider: primaryConfig.name,
+                currency: primaryConfig.currency,
+                isFallback: false,
+                fallbackReason: ''
+            };
+
+            this.priceCache.set(cacheKey, result);
+            return result;
+        }
+    }
+
+    /**
+     * Update card price in the UI (Legacy helper)
      */
     updateCardPrice(cardElement, { price } = {}, _type) {
         if (!cardElement) return;
-        
         const priceElement = cardElement.querySelector('.card-price');
         if (!priceElement) return;
-        
-        // If price is undefined (e.g., placeholder event), keep current text/state
-        if (price === undefined) {
-            return;
-        }
+        if (price === undefined) return;
 
         if (price) {
             priceElement.textContent = `$${price}`;
@@ -265,10 +293,7 @@ export class PriceService {
         }
     }
 
-    /**
-     * Clear the price cache
-     */
     clearCache() {
         this.priceCache.clear();
     }
-} 
+}

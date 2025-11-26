@@ -62,7 +62,7 @@ export class ApiClient {
             /\/binders\/([a-zA-Z0-9_-]+)(?:\/|$)/,
             /\/v1\/trade-binders\/([a-zA-Z0-9_-]+)(?:\/|$)/
         ];
-        
+
         for (const pattern of patterns) {
             const match = url.match(pattern);
             if (match) {
@@ -123,24 +123,24 @@ export class ApiClient {
         const allCards = [];
         let pageNumber = 1;
         const pageSize = 50;
-        
+
         // eslint-disable-next-line no-constant-condition
         while (true) {
             const apiUrl = `${this.baseUrl}/v1/collections/search/${collectionId}?pageNumber=${pageNumber}&pageSize=${pageSize}&sortType=cardName&sortDirection=ascending`;
-            
+
             try {
                 const data = await this.loadFromApiUrl(apiUrl, type);
-                
+
                 // Handle new return format
                 if (typeof data === 'object' && data.apiUrl) {
                     // CORS failed, return the object with API URL
                     return data;
                 }
-                
+
                 if (data && data.trim()) {
                     allCards.push(data);
                     pageNumber++;
-                    
+
                     // Safety check to prevent infinite loops
                     if (pageNumber > 100) {
                         break;
@@ -152,7 +152,7 @@ export class ApiClient {
                 break;
             }
         }
-        
+
         return allCards.join('\n');
     }
 
@@ -166,24 +166,24 @@ export class ApiClient {
         const allCards = [];
         let pageNumber = 1;
         const pageSize = 50;
-        
+
         // eslint-disable-next-line no-constant-condition
         while (true) {
             const apiUrl = `${this.baseUrl}/v1/trade-binders/${binderId}/search?pageNumber=${pageNumber}&pageSize=${pageSize}&playStyle=paperDollars&pricingProvider=cardkingdom&sortColumn=cardName&sortType=cardName&sortDirection=ascending&q=+&setId=&deckId=&game=&condition=&rarity=&isAlter=&isProxy=&finish=&cardLanguageId=&priceMinimum=&priceMaximum=`;
-            
+
             try {
                 const data = await this.loadFromApiUrl(apiUrl, type);
-                
+
                 // Handle new return format
                 if (typeof data === 'object' && data.apiUrl) {
                     // CORS failed, return the object with API URL
                     return data;
                 }
-                
+
                 if (data && data.trim()) {
                     allCards.push(data);
                     pageNumber++;
-                    
+
                     // Safety check to prevent infinite loops
                     if (pageNumber > 100) {
                         break;
@@ -195,7 +195,7 @@ export class ApiClient {
                 break;
             }
         }
-        
+
         return allCards.join('\n');
     }
 
@@ -209,7 +209,7 @@ export class ApiClient {
         try {
             // eslint-disable-next-line no-console
             console.log('Making API request to:', apiUrl);
-            
+
             // Try direct fetch first
             const response = await fetch(apiUrl, {
                 method: 'GET',
@@ -218,13 +218,13 @@ export class ApiClient {
                     'User-Agent': 'Mozilla/5.0 (compatible; MTGCardComparator/1.0)'
                 }
             });
-            
+
             if (!response.ok) {
                 // eslint-disable-next-line no-console
                 console.error('API request failed:', response.status, response.statusText);
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
-            
+
             const data = await response.json();
             // eslint-disable-next-line no-console
             console.log('API response received:', data);
@@ -232,43 +232,16 @@ export class ApiClient {
         } catch (error) {
             // eslint-disable-next-line no-console
             console.error('Error loading from API:', error);
-            
-            // If it's a CORS error, try the local proxy
+
+            // If it's a CORS error, return API URL for manual input (GitHub Pages compatible solution)
             if (error.message.includes('CORS') || error.message.includes('Failed to fetch')) {
                 // eslint-disable-next-line no-console
-                console.log('CORS error detected, trying local proxy...');
-                
-                try {
-                    const proxyUrl = `http://localhost:3001/${apiUrl}`;
-                    // eslint-disable-next-line no-console
-                    console.log('Trying proxy URL:', proxyUrl);
-                    
-                    const proxyResponse = await fetch(proxyUrl, {
-                        method: 'GET',
-                        headers: {
-                            'Accept': 'application/json'
-                        }
-                    });
-                    
-                    if (!proxyResponse.ok) {
-                        throw new Error(`Proxy request failed: HTTP ${proxyResponse.status}`);
-                    }
-                    
-                    const data = await proxyResponse.json();
-                    // eslint-disable-next-line no-console
-                    console.log('Proxy API response received:', data);
-                    return this.parseApiResponse(data, type);
-                } catch (proxyError) {
-                    // eslint-disable-next-line no-console
-                    console.error('Proxy also failed:', proxyError);
-                    
-                    // Return object with API URL and empty string to trigger manual input dialog
-                    // eslint-disable-next-line no-console
-                    console.log('CORS and proxy failed, returning API URL for manual input');
-                    return { apiUrl, cards: '' };
-                }
+                console.log('CORS error detected, will prompt for manual API response input');
+
+                // Return object with API URL and empty string to trigger manual input dialog
+                return { apiUrl, cards: '' };
             }
-            
+
             // For other errors, still throw them
             throw error;
         }
@@ -307,19 +280,19 @@ export class ApiClient {
                 // eslint-disable-next-line no-console
                 console.log('Data keys:', Object.keys(data || {}));
             }
-            
+
             let deckList = '';
-            
+
             // Handle different API response formats
             if (data.mainboard) {
                 const mainboardArray = Array.isArray(data.mainboard) ? data.mainboard : Object.values(data.mainboard);
-                const lines = mainboardArray.map(c => this.buildCardLine(this.normalizeCard(c)) ).sort();
+                const lines = mainboardArray.map(c => this.buildCardLine(this.normalizeCard(c))).sort();
                 deckList += `${lines.join('\n')}\n`;
             } else if (data.cards && Array.isArray(data.cards)) {
-                const lines = data.cards.map(c => this.buildCardLine(this.normalizeCard(c)) ).sort();
+                const lines = data.cards.map(c => this.buildCardLine(this.normalizeCard(c))).sort();
                 deckList += `${lines.join('\n')}\n`;
             } else if (data.data && Array.isArray(data.data)) {
-                const lines = data.data.map(c => this.buildCardLine(this.normalizeCard(c)) ).sort();
+                const lines = data.data.map(c => this.buildCardLine(this.normalizeCard(c))).sort();
                 deckList += `${lines.join('\n')}\n`;
             } else if (typeof data === 'string') {
                 // Direct text format
@@ -331,13 +304,13 @@ export class ApiClient {
                     deckList += `${card.quantity} ${card.name} (${card.set}) ${card.number}${card.foil ? ' *F*' : ''}\n`;
                 });
             }
-            
+
             if (this.debug) {
                 // eslint-disable-next-line no-console
                 console.log('Final deckList:', deckList);
             }
             return deckList.trim();
-            
+
         } catch (error) {
             // eslint-disable-next-line no-console
             console.error('Error parsing API response:', error);
@@ -396,11 +369,11 @@ export class ApiClient {
      * @returns {boolean} - True if the card is foil
      */
     isFoil(card) {
-        return card.card?.isFoil || 
-               card.card?.finish === 'foil' || 
-               card.card?.finish === 'foil-etched' ||
-               card.isFoil ||
-               false;
+        return card.card?.isFoil ||
+            card.card?.finish === 'foil' ||
+            card.card?.finish === 'foil-etched' ||
+            card.isFoil ||
+            false;
     }
 
     /**
@@ -409,11 +382,11 @@ export class ApiClient {
      * @returns {boolean} - True if the card is etched
      */
     isEtched(card) {
-        return card.card?.finish === 'etched' || 
-               card.card?.finish === 'foil-etched' ||
-               card.card?.etched === true ||
-               card.isEtched ||
-               false;
+        return card.card?.finish === 'etched' ||
+            card.card?.finish === 'foil-etched' ||
+            card.card?.etched === true ||
+            card.isEtched ||
+            false;
     }
 
     /**
