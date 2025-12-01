@@ -9,7 +9,11 @@ A web application that helps Magic: The Gathering players compare their wishlist
 - **Flexible Parsing**: Supports various card list formats including foil, etched, and star collector numbers
 - **Sideboard Handling**: Option to include or exclude sideboard cards
 - **Edition Matching**: Option to ignore specific editions when comparing cards
-- **Price Integration**: Display card prices from various providers
+- **Dark Mode**: Modern dark theme with automatic system preference detection and manual toggle
+- **Price Integration**: Display card prices from 8 different providers:
+  - TCGPlayer, Cardmarket, Cardhoarder (Direct support)
+  - CardKingdom, StarCityGames, CardTrader, CoolStuffInc, Manapool (via Moxfield)
+- **GitHub Pages Compatible**: Works on static hosting with manual input fallback for CORS-blocked APIs
 - **Error Reporting**: Detailed feedback on parsing errors
 - **Binder Support**: Load cards from Moxfield binder URLs
 - **Special Characters**: Support for star (★) characters in collector numbers

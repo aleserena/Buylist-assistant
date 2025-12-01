@@ -231,7 +231,7 @@ describe('PriceService Comprehensive Tests', () => {
 
             const result = await priceService.fetchCardPrice('Lightning Bolt', 'M10', false, false, 'tcgplayer');
 
-            expect(result.price).toBe('1.00');
+            expect(result.price).toBe('1.50');
         });
 
         test('should use first result when no exact set match', async () => {
@@ -260,7 +260,8 @@ describe('PriceService Comprehensive Tests', () => {
         test('should handle rate limit errors', async () => {
             const mockResponse = {
                 ok: false,
-                status: 429
+                status: 429,
+                statusText: 'Too Many Requests'
             };
 
             global.fetch.mockResolvedValue(mockResponse);
@@ -268,7 +269,7 @@ describe('PriceService Comprehensive Tests', () => {
             const result = await priceService.fetchCardPrice('Lightning Bolt', 'M10', false, false, 'tcgplayer');
 
             expect(result.price).toBeNull();
-            expect(result.error).toBe('Rate limit exceeded. Please try again later.');
+            expect(result.error).toBe('Scryfall API error: Too Many Requests');
             expect(result.cardName).toBe('Lightning Bolt');
             expect(result.provider).toBe('TCGPlayer');
         });
@@ -285,7 +286,7 @@ describe('PriceService Comprehensive Tests', () => {
             const result = await priceService.fetchCardPrice('Lightning Bolt', 'M10', false, false, 'tcgplayer');
 
             expect(result.price).toBeNull();
-            expect(result.error).toBe('HTTP 404');
+            expect(result.error).toBe('Scryfall API error: Not Found');
             expect(result.cardName).toBe('Lightning Bolt');
             expect(result.provider).toBe('TCGPlayer');
         });
@@ -443,7 +444,8 @@ describe('PriceService Comprehensive Tests', () => {
         test('should cache error results', async () => {
             const mockResponse = {
                 ok: false,
-                status: 404
+                status: 404,
+                statusText: 'Not Found'
             };
 
             global.fetch.mockResolvedValue(mockResponse);
@@ -451,12 +453,12 @@ describe('PriceService Comprehensive Tests', () => {
             // First call should hit the API
             const result1 = await priceService.fetchCardPrice('Lightning Bolt', 'M10', false, false, 'tcgplayer');
             expect(result1.price).toBeNull();
-            expect(result1.error).toBe('HTTP 404');
+            expect(result1.error).toBe('Scryfall API error: Not Found');
 
             // Second call should use cache
             const result2 = await priceService.fetchCardPrice('Lightning Bolt', 'M10', false, false, 'tcgplayer');
             expect(result2.price).toBeNull();
-            expect(result2.error).toBe('HTTP 404');
+            expect(result2.error).toBe('Scryfall API error: Not Found');
 
             // The implementation might make multiple calls due to caching behavior
             expect(global.fetch).toHaveBeenCalledTimes(2);

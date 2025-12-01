@@ -28,21 +28,21 @@ describe('ApiClient Comprehensive Tests', () => {
         test('should extract deck ID from standard deck URL', () => {
             const url = 'https://www.moxfield.com/decks/abc123';
             const result = apiClient.extractDeckId(url);
-            
+
             expect(result).toEqual({ type: 'deck', id: 'abc123' });
         });
 
         test('should extract deck ID from deck URL with trailing slash', () => {
             const url = 'https://www.moxfield.com/deck/xyz789/';
             const result = apiClient.extractDeckId(url);
-            
+
             expect(result).toEqual({ type: 'deck', id: 'xyz789' });
         });
 
         test('should extract deck ID from v2 API URL', () => {
             const url = 'https://www.moxfield.com/v2/decks/all/def456';
             const result = apiClient.extractDeckId(url);
-            
+
             // The regex pattern matches "all" as the ID, not "def456"
             expect(result).toEqual({ type: 'deck', id: 'all' });
         });
@@ -65,7 +65,7 @@ describe('ApiClient Comprehensive Tests', () => {
         test('should handle complex deck IDs', () => {
             const url = 'https://www.moxfield.com/decks/abc-123_xyz-789';
             const result = apiClient.extractDeckId(url);
-            
+
             expect(result).toEqual({ type: 'deck', id: 'abc-123_xyz-789' });
         });
     });
@@ -74,14 +74,14 @@ describe('ApiClient Comprehensive Tests', () => {
         test('should extract collection ID from standard collection URL', () => {
             const url = 'https://www.moxfield.com/collection/abc123';
             const result = apiClient.extractCollectionId(url);
-            
+
             expect(result).toEqual({ type: 'collection', id: 'abc123' });
         });
 
         test('should extract collection ID from v1 API URL', () => {
             const url = 'https://www.moxfield.com/v1/collections/search/xyz789';
             const result = apiClient.extractCollectionId(url);
-            
+
             expect(result).toEqual({ type: 'collection', id: 'xyz789' });
         });
 
@@ -105,14 +105,14 @@ describe('ApiClient Comprehensive Tests', () => {
         test('should extract binder ID from standard binder URL', () => {
             const url = 'https://www.moxfield.com/binders/abc123';
             const result = apiClient.extractBinderId(url);
-            
+
             expect(result).toEqual({ type: 'binder', id: 'abc123' });
         });
 
         test('should extract binder ID from v1 trade-binders URL', () => {
             const url = 'https://www.moxfield.com/v1/trade-binders/xyz789';
             const result = apiClient.extractBinderId(url);
-            
+
             expect(result).toEqual({ type: 'binder', id: 'xyz789' });
         });
 
@@ -135,48 +135,48 @@ describe('ApiClient Comprehensive Tests', () => {
     describe('loadFromUrl', () => {
         test('should handle empty URL', async () => {
             const result = await apiClient.loadFromUrl('', 'wishlist');
-            
+
             expect(global.alert).toHaveBeenCalledWith('Please enter a Moxfield URL');
             expect(result).toBe('');
         });
 
         test('should handle whitespace-only URL', async () => {
             const result = await apiClient.loadFromUrl('   ', 'collection');
-            
+
             expect(global.alert).toHaveBeenCalledWith('Please enter a Moxfield URL');
             expect(result).toBe('');
         });
 
         test('should handle invalid URL format', async () => {
             const result = await apiClient.loadFromUrl('https://example.com/invalid', 'wishlist');
-            
+
             expect(global.alert).toHaveBeenCalledWith('Invalid Moxfield URL format');
             expect(result).toBe('');
         });
 
         test('should call loadFromDeck for deck URLs', async () => {
             const mockLoadFromDeck = jest.spyOn(apiClient, 'loadFromDeck').mockResolvedValue('deck data');
-            
+
             await apiClient.loadFromUrl('https://www.moxfield.com/decks/abc123', 'wishlist');
-            
+
             expect(mockLoadFromDeck).toHaveBeenCalledWith('abc123', 'wishlist');
             mockLoadFromDeck.mockRestore();
         });
 
         test('should call loadFromCollection for collection URLs', async () => {
             const mockLoadFromCollection = jest.spyOn(apiClient, 'loadFromCollection').mockResolvedValue('collection data');
-            
+
             await apiClient.loadFromUrl('https://www.moxfield.com/collection/abc123', 'collection');
-            
+
             expect(mockLoadFromCollection).toHaveBeenCalledWith('abc123', 'collection');
             mockLoadFromCollection.mockRestore();
         });
 
         test('should call loadFromBinder for binder URLs', async () => {
             const mockLoadFromBinder = jest.spyOn(apiClient, 'loadFromBinder').mockResolvedValue('binder data');
-            
+
             await apiClient.loadFromUrl('https://www.moxfield.com/binders/abc123', 'wishlist');
-            
+
             expect(mockLoadFromBinder).toHaveBeenCalledWith('abc123', 'wishlist');
             mockLoadFromBinder.mockRestore();
         });
@@ -185,9 +185,9 @@ describe('ApiClient Comprehensive Tests', () => {
     describe('loadFromDeck', () => {
         test('should construct correct API URL and call loadFromApiUrl', async () => {
             const mockLoadFromApiUrl = jest.spyOn(apiClient, 'loadFromApiUrl').mockResolvedValue('deck data');
-            
+
             await apiClient.loadFromDeck('abc123', 'wishlist');
-            
+
             expect(mockLoadFromApiUrl).toHaveBeenCalledWith(
                 'https://api2.moxfield.com/v2/decks/all/abc123',
                 'wishlist'
@@ -201,9 +201,9 @@ describe('ApiClient Comprehensive Tests', () => {
             const mockLoadFromApiUrl = jest.spyOn(apiClient, 'loadFromApiUrl')
                 .mockResolvedValueOnce('card1\ncard2\ncard3')
                 .mockResolvedValueOnce(''); // Empty response to stop pagination
-            
+
             const result = await apiClient.loadFromCollection('abc123', 'collection');
-            
+
             expect(result).toBe('card1\ncard2\ncard3');
             expect(mockLoadFromApiUrl).toHaveBeenCalledTimes(2);
             mockLoadFromApiUrl.mockRestore();
@@ -214,9 +214,9 @@ describe('ApiClient Comprehensive Tests', () => {
                 .mockResolvedValueOnce('page1\npage2')
                 .mockResolvedValueOnce('page3\npage4')
                 .mockResolvedValueOnce(''); // Empty response to stop pagination
-            
+
             const result = await apiClient.loadFromCollection('abc123', 'collection');
-            
+
             expect(result).toBe('page1\npage2\npage3\npage4');
             expect(mockLoadFromApiUrl).toHaveBeenCalledTimes(3);
             mockLoadFromApiUrl.mockRestore();
@@ -225,9 +225,9 @@ describe('ApiClient Comprehensive Tests', () => {
         test('should handle CORS error response', async () => {
             const mockLoadFromApiUrl = jest.spyOn(apiClient, 'loadFromApiUrl')
                 .mockResolvedValue({ apiUrl: 'https://api2.moxfield.com/v1/collections/search/abc123', cards: '' });
-            
+
             const result = await apiClient.loadFromCollection('abc123', 'collection');
-            
+
             expect(result).toEqual({ apiUrl: 'https://api2.moxfield.com/v1/collections/search/abc123', cards: '' });
             mockLoadFromApiUrl.mockRestore();
         });
@@ -235,9 +235,9 @@ describe('ApiClient Comprehensive Tests', () => {
         test('should handle errors gracefully', async () => {
             const mockLoadFromApiUrl = jest.spyOn(apiClient, 'loadFromApiUrl')
                 .mockRejectedValue(new Error('Network error'));
-            
+
             const result = await apiClient.loadFromCollection('abc123', 'collection');
-            
+
             expect(result).toBe('');
             mockLoadFromApiUrl.mockRestore();
         });
@@ -245,9 +245,9 @@ describe('ApiClient Comprehensive Tests', () => {
         test('should prevent infinite loops', async () => {
             const mockLoadFromApiUrl = jest.spyOn(apiClient, 'loadFromApiUrl')
                 .mockResolvedValue('data'); // Always return data to trigger pagination
-            
+
             const result = await apiClient.loadFromCollection('abc123', 'collection');
-            
+
             // Should stop after 100 pages
             expect(mockLoadFromApiUrl).toHaveBeenCalledTimes(100);
             expect(result).toBe('data\n'.repeat(100).trim());
@@ -260,9 +260,9 @@ describe('ApiClient Comprehensive Tests', () => {
             const mockLoadFromApiUrl = jest.spyOn(apiClient, 'loadFromApiUrl')
                 .mockResolvedValueOnce('binder1\nbinder2')
                 .mockResolvedValueOnce(''); // Empty response to stop pagination
-            
+
             const result = await apiClient.loadFromBinder('abc123', 'wishlist');
-            
+
             expect(result).toBe('binder1\nbinder2');
             expect(mockLoadFromApiUrl).toHaveBeenCalledTimes(2);
             mockLoadFromApiUrl.mockRestore();
@@ -271,9 +271,9 @@ describe('ApiClient Comprehensive Tests', () => {
         test('should handle CORS error response', async () => {
             const mockLoadFromApiUrl = jest.spyOn(apiClient, 'loadFromApiUrl')
                 .mockResolvedValue({ apiUrl: 'https://api2.moxfield.com/v1/trade-binders/abc123', cards: '' });
-            
+
             const result = await apiClient.loadFromBinder('abc123', 'wishlist');
-            
+
             expect(result).toEqual({ apiUrl: 'https://api2.moxfield.com/v1/trade-binders/abc123', cards: '' });
             mockLoadFromApiUrl.mockRestore();
         });
@@ -286,11 +286,11 @@ describe('ApiClient Comprehensive Tests', () => {
                 json: () => Promise.resolve({ mainboard: { cards: [] } })
             };
             global.fetch.mockResolvedValue(mockResponse);
-            
+
             const mockParseApiResponse = jest.spyOn(apiClient, 'parseApiResponse').mockReturnValue('parsed data');
-            
+
             const result = await apiClient.loadFromApiUrl('https://api2.moxfield.com/v2/decks/all/abc123', 'wishlist');
-            
+
             expect(global.fetch).toHaveBeenCalledWith(
                 'https://api2.moxfield.com/v2/decks/all/abc123',
                 expect.objectContaining({
@@ -312,37 +312,31 @@ describe('ApiClient Comprehensive Tests', () => {
                 statusText: 'Not Found'
             };
             global.fetch.mockResolvedValue(mockResponse);
-            
+
             await expect(apiClient.loadFromApiUrl('https://api2.moxfield.com/v2/decks/all/abc123', 'wishlist'))
                 .rejects.toThrow('HTTP 404: Not Found');
         });
 
-        test('should handle CORS errors with proxy fallback', async () => {
-            // First call fails with CORS error
+        test('should handle CORS errors with fallback', async () => {
+            // Call fails with CORS error
             global.fetch.mockRejectedValueOnce(new Error('CORS error'));
-            
-            // Proxy call succeeds
-            const mockProxyResponse = {
-                ok: true,
-                json: () => Promise.resolve({ mainboard: { cards: [] } })
-            };
-            global.fetch.mockResolvedValueOnce(mockProxyResponse);
-            
-            const mockParseApiResponse = jest.spyOn(apiClient, 'parseApiResponse').mockReturnValue('proxy data');
-            
+
             const result = await apiClient.loadFromApiUrl('https://api2.moxfield.com/v2/decks/all/abc123', 'wishlist');
-            
-            expect(global.fetch).toHaveBeenCalledTimes(2);
-            expect(result).toBe('proxy data');
-            mockParseApiResponse.mockRestore();
+
+            // Should not retry with proxy, just return fallback object
+            expect(global.fetch).toHaveBeenCalledTimes(1);
+            expect(result).toEqual({
+                apiUrl: 'https://api2.moxfield.com/v2/decks/all/abc123',
+                cards: ''
+            });
         });
 
         test('should handle proxy failure', async () => {
             // Both direct and proxy calls fail
             global.fetch.mockRejectedValue(new Error('CORS error'));
-            
+
             const result = await apiClient.loadFromApiUrl('https://api2.moxfield.com/v2/decks/all/abc123', 'wishlist');
-            
+
             expect(result).toEqual({
                 apiUrl: 'https://api2.moxfield.com/v2/decks/all/abc123',
                 cards: ''
@@ -351,7 +345,7 @@ describe('ApiClient Comprehensive Tests', () => {
 
         test('should handle network errors', async () => {
             global.fetch.mockRejectedValue(new Error('Network error'));
-            
+
             await expect(apiClient.loadFromApiUrl('https://api2.moxfield.com/v2/decks/all/abc123', 'wishlist'))
                 .rejects.toThrow('Network error');
         });
@@ -360,9 +354,9 @@ describe('ApiClient Comprehensive Tests', () => {
     describe('parseManualApiResponse', () => {
         test('should parse valid JSON data', () => {
             const mockParseApiResponse = jest.spyOn(apiClient, 'parseApiResponse').mockReturnValue('parsed data');
-            
+
             const result = apiClient.parseManualApiResponse('{"mainboard": {"cards": []}}', 'wishlist');
-            
+
             expect(result).toBe('parsed data');
             expect(mockParseApiResponse).toHaveBeenCalledWith({ mainboard: { cards: [] } }, 'wishlist');
             mockParseApiResponse.mockRestore();
@@ -398,9 +392,9 @@ describe('ApiClient Comprehensive Tests', () => {
                     }
                 }
             };
-            
+
             const result = apiClient.parseApiResponse(data, 'wishlist');
-            
+
             expect(result).toContain('2 Lightning Bolt (M10) 133');
             expect(result).toContain('1 Counterspell (M10) 50 *F*');
         });
@@ -418,9 +412,9 @@ describe('ApiClient Comprehensive Tests', () => {
                     }
                 ]
             };
-            
+
             const result = apiClient.parseApiResponse(data, 'wishlist');
-            
+
             expect(result).toContain('2 Lightning Bolt (M10) 133');
         });
 
@@ -447,9 +441,9 @@ describe('ApiClient Comprehensive Tests', () => {
                     }
                 }
             };
-            
+
             const result = apiClient.parseApiResponse(data, 'wishlist');
-            
+
             expect(result).toContain('1 Lightning Bolt (M10) 133 *F*');
             expect(result).toContain('1 Counterspell (M10) 50 *E*');
         });
@@ -478,9 +472,9 @@ describe('ApiClient Comprehensive Tests', () => {
                     }
                 ]
             };
-            
+
             const result = apiClient.parseApiResponse(data, 'wishlist');
-            
+
             expect(result).toContain('2 Lightning Bolt (M10) 133');
             expect(result).toContain('1 Counterspell (M10) 50 *F*');
         });
@@ -500,9 +494,9 @@ describe('ApiClient Comprehensive Tests', () => {
                     }
                 ]
             };
-            
+
             const result = apiClient.parseApiResponse(data, 'wishlist');
-            
+
             expect(result).toContain('2 Lightning Bolt (M10) 133');
         });
     });
@@ -510,9 +504,9 @@ describe('ApiClient Comprehensive Tests', () => {
     describe('parseApiResponse - String Format', () => {
         test('should handle string data directly', () => {
             const data = '2 Lightning Bolt (M10) 133\n1 Counterspell (M10) 50';
-            
+
             const result = apiClient.parseApiResponse(data, 'wishlist');
-            
+
             expect(result).toBe('2 Lightning Bolt (M10) 133\n1 Counterspell (M10) 50');
         });
     });
@@ -545,9 +539,9 @@ describe('ApiClient Comprehensive Tests', () => {
                     }
                 }
             };
-            
+
             const result = apiClient.findCardsInResponse(data);
-            
+
             expect(result).toHaveLength(1);
             expect(result[0]).toEqual({
                 quantity: 2,
@@ -573,9 +567,9 @@ describe('ApiClient Comprehensive Tests', () => {
                     }
                 ]
             };
-            
+
             const result = apiClient.findCardsInResponse(data);
-            
+
             expect(result).toHaveLength(1);
             expect(result[0]).toEqual({
                 quantity: 1,
