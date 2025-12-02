@@ -66,21 +66,22 @@ export class PriceService {
      */
     getProviderPriceFields(providerKey, isFoil, isEtched) {
         switch (providerKey) {
-            case 'tcgplayer':
-                if (isEtched) return ['usd_etched', 'usd_foil', 'usd'];
-                if (isFoil) return ['usd_foil', 'usd'];
-                return ['usd'];
-            case 'cardmarket':
-                if (isFoil) return ['eur_foil', 'eur'];
-                return ['eur'];
-            case 'cardhoarder':
-                if (isFoil) return ['tix_foil', 'tix'];
-                return ['tix'];
-            default:
-                // For Moxfield providers (ck, scg, etc.)
-                const base = this.providers[providerKey]?.priceField || providerKey;
-                if (isFoil) return [`${base}_foil`, base];
-                return [base, `${base}_foil`];
+        case 'tcgplayer':
+            if (isEtched) return ['usd_etched', 'usd_foil', 'usd'];
+            if (isFoil) return ['usd_foil', 'usd'];
+            return ['usd'];
+        case 'cardmarket':
+            if (isFoil) return ['eur_foil', 'eur'];
+            return ['eur'];
+        case 'cardhoarder':
+            if (isFoil) return ['tix_foil', 'tix'];
+            return ['tix'];
+        default: {
+            // For Moxfield providers (ck, scg, etc.)
+            const base = this.providers[providerKey]?.priceField || providerKey;
+            if (isFoil) return [`${base}_foil`, base];
+            return [base, `${base}_foil`];
+        }
         }
     }
 
